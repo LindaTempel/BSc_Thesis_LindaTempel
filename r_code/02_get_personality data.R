@@ -47,7 +47,7 @@ Data_pers <- Data_pers %>% dplyr::select(VP, SD01, SD02_01, SD07, SD07_09, SD08_
                                         GA21_01:GA23_09)
 
 
-# ----- 5) Compute scale scores
+# ----- 5) Compute MAE scale scores -----------------------
 
 # Select MAE data
 MAE <- Data_pers %>% select(VP, AE01_01:AE01_30)
@@ -88,4 +88,6 @@ agentic_ext <- dplyr::select(MAE, VP, PE, AC, SP, MAE_Score)
 # ----- 5) Export MAE data --------------------------------
 #write.table(agentic_ext, './agency_scores.txt', row.names = F)
 
+
+# ----- 6) 
 
