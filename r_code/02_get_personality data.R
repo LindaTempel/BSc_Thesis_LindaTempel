@@ -85,7 +85,7 @@ MAE <- MAE %>% mutate(MAE_Score = (PE+AC+SP))
 agentic_ext <- dplyr::select(MAE, VP, PE, AC, SP, MAE_Score)
 
 
-# ----- 5) Export data ------------------------------------
+# ----- 5) Export MAE data --------------------------------
 #write.table(agentic_ext, './agency_scores.txt', row.names = F)
 
 
