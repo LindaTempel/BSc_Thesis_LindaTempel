@@ -89,5 +89,86 @@ agentic_ext <- dplyr::select(MAE, VP, PE, AC, SP, MAE_Score)
 #write.table(agentic_ext, './agency_scores.txt', row.names = F)
 
 
-# ----- 6) 
+# ----- 6) Compute RST scale scores -----------------------
 
+# Select RST data
+RST <- Data_pers %>% select(VP, RS01_01:RS01_84)
+
+# Drop control items
+RST <- select(RST, -RS01_63, -RS01_49, -RS01_59, -RS01_72)
+
+# Chronbach's Alpha (internal concistency) 
+psych::alpha(RST[, grep(names(RST), pattern = '^RS')], 
+             check.keys = TRUE)
+
+# Chronbach's Alpha (internal concistency) for sub scales
+# FFFS
+psych::alpha(dplyr::select(RST, RS01_10, RS01_24, RS01_52, 
+                           RS01_60, RS01_61, RS01_64, RS01_69,
+                           RS01_77, RS01_78, RS01_81), 
+             check.keys = TRUE)
+
+# BIS
+psych::alpha(dplyr::select(RST, RS01_01, RS01_02, RS01_07, 
+                           RS01_08, RS01_11, RS01_21, RS01_23, 
+                           RS01_28, RS01_37, RS01_41, RS01_42, 
+                           RS01_55, RS01_56, RS01_62, RS01_65, 
+                           RS01_66, RS01_74, RS01_75, RS01_76, 
+                           RS01_79, RS01_80, RS01_82, RS01_83), 
+             check.keys = TRUE)
+
+# BAS Reward Interest
+psych::alpha(dplyr::select(RST, RS01_12, RS01_15, RS01_17, 
+                           RS01_18, RS01_33, RS01_40, RS01_44), 
+             check.keys = TRUE)
+
+# BAS Reward Reactivity
+psych::alpha(dplyr::select(RST, RS01_03, RS01_04, RS01_09, RS01_19, 
+                           RS01_30, RS01_32, RS01_32, RS01_38, 
+                           RS01_45, RS01_47), 
+             check.keys = TRUE)
+
+# BAS Goal-Drive Persistance
+psych::alpha(dplyr::select(RST, RS01_05, RS01_13, RS01_25, RS01_39, 
+                           RS01_54, RS01_71, RS01_84), 
+             check.keys = TRUE)
+
+# BAS Impulsivity
+psych::alpha(dplyr::select(RST, RS01_29, RS01_35, RS01_36, RS01_48, 
+                           RS01_53, RS01_57, RS01_68, RS01_70), 
+             check.keys=TRUE)
+
+# BAS ALL
+psych::alpha(dplyr::select(RST, RS01_12, RS01_15, RS01_17, 
+                           RS01_18, RS01_33, RS01_40, RS01_44,
+                           RS01_03, RS01_04, RS01_09, RS01_19, 
+                           RS01_30, RS01_32, RS01_32, RS01_38, 
+                           RS01_45, RS01_47,
+                           RS01_05, RS01_13, RS01_25, RS01_39, 
+                           RS01_54, RS01_71, RS01_84,
+                           RS01_29, RS01_35, RS01_36, RS01_48, 
+                           RS01_53, RS01_57, RS01_68, RS01_70), 
+             check.keys=TRUE)
+
+
+# ----- Create aggregated scale values
+# RST SCALE VALUES
+RST <- dplyr::mutate(RST, 
+                     FFFS = (RS01_10 + RS01_24 + RS01_52 + RS01_60 + RS01_61 + RS01_64 + RS01_69 + RS01_77 + RS01_78 + RS01_81),
+                     BIS = (RS01_01 + RS01_02 + RS01_07 + RS01_08 + RS01_11 + RS01_21 + RS01_23 + RS01_28 + 
+                              RS01_37 + RS01_41 + RS01_42 + RS01_55 + RS01_56 + RS01_62 + RS01_65 + RS01_66 +
+                              RS01_74 + RS01_75 + RS01_76 +  RS01_79 + RS01_80 + RS01_82 + RS01_83),
+                     BAS_Rew_Int = (RS01_12 + RS01_15 + RS01_17 + RS01_18 + RS01_33 + RS01_40 + RS01_44),
+                     BAS_Rew_Reac = (RS01_03 + RS01_04 + RS01_09 + RS01_19 + RS01_30 + RS01_32 + RS01_32 + RS01_38 + RS01_45 + RS01_47),
+                     BAS_Goal_Drive = (RS01_05 + RS01_13 + RS01_25 + RS01_39 + RS01_54 + RS01_71 + RS01_84),
+                     BAS_Impulsiv = (RS01_29 +  RS01_35 + RS01_36 + RS01_48 + RS01_53 + RS01_57 + RS01_68 + RS01_70))
+
+# ----- Overall MAE-SCORE
+# RST SCORE
+RST <- dplyr::mutate(RST, 
+                     BAS_Score = (BAS_Rew_Int + BAS_Rew_Reac + BAS_Goal_Drive + BAS_Impulsiv))
+
+RST_Scales <- dplyr::select(RST, VP, FFFS:BAS_Score)
+
+# ----- 5) Export MAE data --------------------------------
+#write.table(RST_Scales, './RST_Scales.txt', row.names = F)
