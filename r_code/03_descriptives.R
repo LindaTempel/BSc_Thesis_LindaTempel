@@ -1,18 +1,58 @@
-###Descriptives 
+##### ##### #####     Analysis scripts for descriptive analysis  ##### ##### #####
+#                                    June 2018 
 
-## Mittelwert und Histogramm 
-mean(Data_full$RT)
 
-hist(Data_full$RT)
 
-mean(Data_full$VPayoff)
+# Load helper functions
+setwd("D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten")
+source('./r_functions/getPacks.R') # <- path to getPacks function
 
-hist(Data_full$Payoff)
+# Load necessary packages
+pkgs <- c('dplyr', 'plyr')
+getPacks(pkgs)
+rm(pkgs)
 
-hist(Data_full$RT, xlab = "RT", ylab = "Häufigkeit", main = "Verteilung RT") ##Bezeichnungen der Achsen ändern
+##-----------Part A: Behavioral data-------------------------
 
-hist(Data_full$Payoff, xlab = "payoff", ylab = "Häufigkeit", main = "Verteilung payoff")
+# means, standard deviation
+mean(Data_card$RT)
+sd(Data_card$RT)
+mean(Data_card$Payoff)
+sd(Data_card$Payoff)
 
-boxplot(Data_full$Payoff)      ##Boxplot ausgeben
 
-table(Data_full$VP)       ##Häufigkeiten
+
+
+# graphs
+
+
+hist(Data_card$RT, xlab = "RT", ylab = "Häufigkeit", main = "Verteilung RT") 
+
+hist(Data_card$Payoff, xlab = "payoff", ylab = "Häufigkeit", main = "Verteilung payoff")
+
+boxplot(Data_card$Payoff)    
+
+
+
+## ---------Part B: Personality data-------------------------
+
+# means, standard deviation
+mean(Data_pers_score$MAE_Score)
+sd(Data_pers_score$MAE_Score)
+
+mean (Data_pers_score$FFFS)
+sd (Data_pers_score$FFFS)
+
+mean(Data_pers_score$BIS)
+sd(Data_pers_score$BIS)
+
+mean(Data_pers_score$BAS_Score)
+sd(Data_pers_score$BAS_Score)
+
+#graphs
+
+hist(Data_pers_score$MAE_Score)
+hist(Data_pers_score$FFFS)
+hist(Data_pers_score$BIS)
+hist(Data_pers_score$BAS_Score)
+

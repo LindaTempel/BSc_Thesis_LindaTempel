@@ -1,44 +1,48 @@
-##### ##### #####     Analysis scrips for behavioral data   ##### ##### #####
+##### ##### #####     Analysis scripts for behavioral data   ##### ##### #####
 #                                 May 2018 
 #                                     
 
 
-# Load nescessary packages
-require(dplyr, plyr)
+# Load helper functions
+setwd("D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten")
+source('./r_functions/getPacks.R') # <- path to getPacks function
 
-# ----- 1) Read in the data ---------------------
+# Load necessary packages
+pkgs <- c('dplyr', 'plyr')
+getPacks(pkgs)
+rm(pkgs)
+
+# ----- 1) Read in the data -------------------------------------------
 
 # # Set path before start
-# path <- c("") # <- location of files
+path <- c("D:/Users/Linda Tempel/Documents/Psychologie/Bachelorarbeit/Daten/rawdata") # <- location of files
 
 paths <- dir(path = path, full.names = T, pattern = "\\.txt$")
 names(paths) <- basename(paths)
 
 
 
-# ----- 2) Create data frame containing all files and observations
-
-# **  RUN CODE to get dataframe with behavioral data form each individual
-# **  The code cuts the dataframe down to a tidy version containing relevant variables 
-# **  with the right attributues.
+# ----- 2) Create data frame containing all files and observations------
 
 # Read in files
 Data_behav <- plyr::ldply(paths, read.table, sep =",", dec = ".", header=F)
 rm(paths)
 
-##Variablen löschen
+# Delete variables
 
 Data_behav<- Data_behav %>% dplyr::select(.id, V2, V4, V6, V8, V10, V12)
 
-## Variablen umbenennen
+# Rename variables
 
 names(Data_behav) <- c('VP', 'Block', 'Trial', 'Deck', 'Value', 'RT', 'Payoff')
 
-##Variablenwerte bereinigen (string)
+# Clean String Variables
 
 Data_behav$VP<- gsub(Data_behav$VP, pattern = "rawdata.txt", replacement = "")
 
-##Aufteilen nach Blöcken (für einfacheres erstellen neuer Variablen)
+#------3) Create new variables-----------------------------------------
+
+# Split file into blocks 
 
 Data_B1<-dplyr::filter(Data_behav, Block==1)
 unique(Data_B1$Block)
@@ -47,12 +51,7 @@ unique(Data_B2$Block)
 Data_B3<-dplyr::filter(Data_behav, Block==3)
 unique(Data_B3$Block)
 
-
-
-## Neue Variablen Karte und gains/losses erstellen
-
-  
-## Reorder the decks to match original IGT
+# Add variable CARD
 Data_B1$Deck <- factor(Data_B1$Deck)
 Data_B1$Card <- plyr::revalue(Data_B1$Deck, c('1' = 'A', '2' = 'D', '3' = 'C', '4' = 'B'))
 
@@ -62,9 +61,7 @@ Data_B2$Card <- plyr::revalue(Data_B2$Deck, c('1' = 'B', '2' = 'C', '3' = 'A', '
 Data_B3$Deck <- factor(Data_B3$Deck)
 Data_B3$Card <- plyr::revalue(Data_B3$Deck, c('1' = 'D', '2' = 'A', '3' = 'B', '4' = 'C'))
 
-
-###
-# ------ ADD gain & loss columns for Block 1------------------------------------
+# ------ Add GAIN & LOSS columns for Block 1 and variable NET_PAYOFF-----
 
 for (i in 1:nrow(Data_B1)) {  
   
@@ -145,9 +142,9 @@ for (i in 1:nrow(Data_B1)) {
 }
 
 rm(i)
-names(Data_B1)[9:11] <- c('gain','loss', 'payoff_trial')
+names(Data_B1)[9:11] <- c('gain','loss', 'net_payoff')
 
-# ------ ADD gain & loss columns for Block 2 ------------------------------------
+# ------ Add GAIN & LOSS columns for Block 2 and variable NET_PAYOFF------
 
 for (i in 1:nrow(Data_B2)) {  
   
@@ -228,9 +225,9 @@ for (i in 1:nrow(Data_B2)) {
 }
 
 rm(i)
-names(Data_B2)[9:11] <- c('gain','loss', 'payoff_trial')
+names(Data_B2)[9:11] <- c('gain','loss', 'net_payoff')
 
-# ------ ADD gain & loss columns for Block 3 ------------------------------------
+# ------ Add GAIN & LOSS columns for Block 3 and variable NET_PAYOFF------
 
 for (i in 1:nrow(Data_B3)) {  
   
@@ -311,8 +308,10 @@ for (i in 1:nrow(Data_B3)) {
 }
 
 rm(i)
-names(Data_B3)[9:11] <- c('gain','loss', 'payoff_trial')
+names(Data_B3)[9:11] <- c('gain','loss', 'net_payoff')
 
 
+#-----4) Create new data frame containing all blocks-------------------
 
 Data_card<-rbind(Data_B1, Data_B2, Data_B3)
+

@@ -1,25 +1,25 @@
-##### ##### #####     Analysis scrips for personality data   ##### ##### #####
+##### ##### #####     Analysis scripts for personality data   ##### ##### #####
 #                                 June 2018 
 #                                     
 
 
 # Load helper functions
 setwd("D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten")
-source('./r_funtions/getPacks.R') # <- path to getPacks function
+source('./r_functions/getPacks.R') # <- path to getPacks function
 
-# Load nescessary packages
+# Load necessary packages
 pkgs <- c('dplyr', 'plyr', 'foreign', 'psych')
 getPacks(pkgs)
 rm(pkgs)
 
-# ----- 1) Soscisurvey Datei einlesen ---------------------
+# ----- 1) Read Soscisurvey file -------------------------
 Data_pers <- read.csv(file = "./Perso_IGT.csv", 
                       sep = ";", header=T)
 
-# ----- 2) Pilot daten rauswerfen -------------------------
+# ----- 2) Remove Pilot Data -----------------------------
 Data_pers <- Data_pers[-c(1, 2, 7), ]
 
-# ----- 3) CASE in VP umcodieren --------------------------
+# ----- 3) Recode CASE into VP ---------------------------
 
 # int to factor
 Data_pers$CASE <- as.factor(Data_pers$CASE)
@@ -50,7 +50,7 @@ Data_pers <- Data_pers %>% dplyr::select(VP, SD01, SD02_01, SD07, SD07_09, SD08_
 # ----- 5) Compute MAE scale scores -----------------------
 
 # Select MAE data
-MAE <- Data_pers %>% select(VP, AE01_01:AE01_30)
+MAE <- Data_pers %>% dplyr::select(VP, AE01_01:AE01_30)
 
 # Chronbach's Alpha (internal concistency) 
 psych::alpha(MAE[, grep(names(MAE), pattern = '^AE')], 
@@ -82,17 +82,17 @@ MAE <- MAE %>% mutate( PE = (AE01_02 + AE01_04 - AE01_07 + AE01_09 + AE01_12 + A
 # MAE SCORE (Overall SCORE)
 MAE <- MAE %>% mutate(MAE_Score = (PE+AC+SP))
 
-agentic_ext <- dplyr::select(MAE, VP, PE, AC, SP, MAE_Score)
+MAE_scales <- dplyr::select(MAE, VP, PE, AC, SP, MAE_Score)
 
 
-# ----- 5) Export MAE data --------------------------------
-#write.table(agentic_ext, './agency_scores.txt', row.names = F)
+# ----- 6) Export MAE data --------------------------------
+#write.table(MAE_scales, './agency_scores.txt', row.names = F)
 
 
-# ----- 6) Compute RST scale scores -----------------------
+# ----- 7) Compute RST scale scores -----------------------
 
 # Select RST data
-RST <- Data_pers %>% select(VP, RS01_01:RS01_84)
+RST <- Data_pers %>% dplyr::select(VP, RS01_01:RS01_84)
 
 # Drop control items
 RST <- select(RST, -RS01_63, -RS01_49, -RS01_59, -RS01_72)
@@ -163,12 +163,23 @@ RST <- dplyr::mutate(RST,
                      BAS_Goal_Drive = (RS01_05 + RS01_13 + RS01_25 + RS01_39 + RS01_54 + RS01_71 + RS01_84),
                      BAS_Impulsiv = (RS01_29 +  RS01_35 + RS01_36 + RS01_48 + RS01_53 + RS01_57 + RS01_68 + RS01_70))
 
-# ----- Overall MAE-SCORE
+# ----- Overall RST-SCORE
 # RST SCORE
 RST <- dplyr::mutate(RST, 
                      BAS_Score = (BAS_Rew_Int + BAS_Rew_Reac + BAS_Goal_Drive + BAS_Impulsiv))
 
-RST_Scales <- dplyr::select(RST, VP, FFFS:BAS_Score)
+RST_scales <- dplyr::select(RST, VP, FFFS:BAS_Score)
 
-# ----- 5) Export MAE data --------------------------------
-#write.table(RST_Scales, './RST_Scales.txt', row.names = F)
+# ----- 8) Export RST data --------------------------------
+#write.table(RST_scales, './RST_Scales.txt', row.names = F)
+
+#-------9) Combine RST and MAE-----------------------------
+Data_pers_score <- merge (MAE_scales, RST_scales, by.x = 'VP', by.y = 'VP')
+
+#-------10) Add Scores to rest of personality data-----------------------------
+Data_pers2 <- Data_pers %>% dplyr::select(VP, SD01, SD02_01, SD07, SD07_09, SD08_01, SD09_01, SD22, 
+                                         GA21_01:GA23_09)
+Data_pers_full <- merge (Data_pers2, Data_pers_score, by.x = 'VP', by.y = 'VP')
+
+#-------11) Delete work-in-progress-data
+rm(MAE, MAE_scales, RST, RST_scales, Data_pers2)
