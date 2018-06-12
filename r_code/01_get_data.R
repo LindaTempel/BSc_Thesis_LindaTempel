@@ -314,4 +314,4 @@ names(Data_B3)[9:11] <- c('gain','loss', 'net_payoff')
 #-----4) Create new data frame containing all blocks-------------------
 
 Data_card<-rbind(Data_B1, Data_B2, Data_B3)
-
+rm(Data_B1, Data_B2, Data_B3)
