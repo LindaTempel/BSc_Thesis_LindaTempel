@@ -56,3 +56,27 @@ hist(Data_pers_score$FFFS)
 hist(Data_pers_score$BIS)
 hist(Data_pers_score$BAS_Score)
 
+#sample characteristics
+range(Data_pers_full$SD02_01)
+mean(Data_pers_full$SD02_01)
+sd(Data_pers_full$SD02_01)
+
+
+count(Data_pers_full, 'SD01')
+
+Data_pers_full$SD09_01 <- plyr::revalue(Data_pers_full$SD09_01, c('Psychologie B.Sc.' = 'Psychologie',
+                                                                  'Psychologiestudentin ' = 'Psychologie',
+                                                                  'Psychologie, Bsc.' = 'Psychologie',
+                                                                  'Bachelor Psychologie' ='Psychologie', 
+                                                                  'Master Chemie' = 'Chemie', 
+                                                                  'MSc Chemie'= 'Chemie', 
+                                                                  'B.A. Sozialwissenschaften' = 'Sozialwissenschaften'))
+count(Data_pers_full, 'SD09_01')
+
+##Data_pers_full$SD08_01 <- as.numeric(Data_pers_full$SD08_01)
+## funktioniert nicht, evtl weil es factor ist? as.numeric oder is.numeric zerstört aber Wert
+##mean(Data_pers_full$SD08_01)
+
+
+
+

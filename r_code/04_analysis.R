@@ -6,7 +6,8 @@ setwd("D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten")
 source('./r_functions/getPacks.R') # <- path to getPacks function
 
 # Load necessary packages
-pkgs <- c('dplyr', 'plyr', 'Hmisc', 'multcomp', 'effects', 'phia', 'emmeans', 'lme4', 'sjPlot', 'lmerTest')
+pkgs <- c('dplyr', 'plyr', 'Hmisc', 'multcomp', 'effects', 'phia', 'emmeans', 'lme4',
+          'sjPlot', 'lmerTest', 'stargazer', 'lemon', 'gridExtra', 'ggplot2')
 getPacks(pkgs)
 rm(pkgs)
 
@@ -25,6 +26,23 @@ Data_sum <- Data_full %>%
   dplyr::filter(!Card==0)
 
 Data_sum %>% dplyr::group_by(Block, Card) %>% dplyr::summarise(M=mean(N), SD=sd(N), SE=sd(N)/sqrt(sum(N)))
+
+Data_sum2 <-Data_sum %>% dplyr::group_by(Block, Card) %>% dplyr::summarise(M=mean(N), SD=sd(N), SE=sd(N)/sqrt(sum(N)))
+
+pdf("data_sum2.pdf", height=11, width=8.5)
+grid.table(Data_sum2)
+dev.off()
+
+
+
+#ggplot(Data_sum2, aes(x = Card, y = M)) 
+  geom_bar(fill = "#0073C2FF", stat = "identity") 
+  geom_text(aes(label = means), vjust = -0.3)
+  
+
+#stargazer(Data_sum2, type='html', out='table1.htm')
+
+##Data_sum$score <- plyer::revalue(Data_sum$score= C+D - A+B)
 
 #--------Analysis: Anova RT by Block-----------------------------------------------
 

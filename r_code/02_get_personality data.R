@@ -58,15 +58,15 @@ psych::alpha(MAE[, grep(names(MAE), pattern = '^AE')],
 
 # COMPUTE SCALE SCORES
 # Check internal concistency
-psych::alpha(select(MAE, AE01_02, AE01_04, AE01_07, AE01_09, AE01_12, 
-                    AE01_18, AE01_20, AE01_24, AE01_26, AE01_29), 
+psych::alpha(dplyr::select(MAE, AE01_02, AE01_04, AE01_07, AE01_09, AE01_12, 
+                    AE01_18, AE01_20, AE01_24, AE01_26, AE01_29),
              check.keys=TRUE)    # Well-Being Subscale
 
-psych::alpha(select(MAE, AE01_01, AE01_05, AE01_08, AE01_11, AE01_14, 
+psych::alpha(dplyr::select(MAE, AE01_01, AE01_05, AE01_08, AE01_11, AE01_14, 
                     AE01_16, AE01_17, AE01_22, AE01_25, AE01_28), 
              check.keys=TRUE)    # Achievement Striving Subscale
 
-psych::alpha(select(MAE, AE01_03, AE01_06, AE01_10, AE01_13, AE01_15, 
+psych::alpha(dplyr::select(MAE, AE01_03, AE01_06, AE01_10, AE01_13, AE01_15, 
                     AE01_19, AE01_21, AE01_23, AE01_27, AE01_30), 
              check.keys=TRUE)    # Social Potency Subscale
 
