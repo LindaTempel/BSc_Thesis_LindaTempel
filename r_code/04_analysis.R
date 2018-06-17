@@ -123,6 +123,56 @@ sjp.lmer(fm3,
          vars = "Block",
          facet.grid = FALSE)
 
+#------Analysis: Personality for RT-------------------
+
+#MAE total Score
+m4<-lm(RT~MAE_Score, data=Data_full)
+anova(m4)
+summary(m4)
+ 
+#BIS
+m5<-lm(RT~BIS, data=Data_full)
+anova(m5)
+summary(m5)
+
+#BAS
+m6<-lm(RT~BAS_Score, data=Data_full)
+anova(m6)
+summary(m6)
+
+#FFS
+m7<-lm(RT~FFFS, data=Data_full)
+anova(m7)
+summary(m7)
+
+####To do: same for subscales
+
+#-------Analysis: Personality and Block for RT------
+
+#MAE total Score
+m4.2<-lm(RT~MAE_Score*Block, data=Data_full)
+anova(m4.2)
+summary(m4.2)
+
+#BIS
+m5.2<-lm(RT~BIS*Block, data=Data_full)
+anova(m5.2)
+summary(m5.2)
+
+#BAS
+m6.2<-lm(RT~BAS_Score*Block, data=Data_full)
+anova(m6.2)
+summary(m6.2)
+
+#FFS
+m7.2<-lm(RT~FFFS*Block, data=Data_full)
+anova(m7.2)
+summary(m7.2)
+
+
+####To do: same for subscales!
+
+
 
 #---------Correlations in Personality data----------------------
 
