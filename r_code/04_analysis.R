@@ -25,9 +25,40 @@ Data_sum <- Data_full %>%
   dplyr::summarise(N=sum(!is.na(Card))) %>% 
   dplyr::filter(!Card==0)
 
-Data_sum %>% dplyr::group_by(Block, Card) %>% dplyr::summarise(M=mean(N), SD=sd(N), SE=sd(N)/sqrt(sum(N)))
+Graph <- Data_sum %>% 
+  dplyr::group_by(Block, Card) %>% 
+  dplyr::summarise(M=mean(N), SD=sd(N), SE=sd(N)/sqrt(sum(!is.na(N))))%>%
+  dplyr::filter(!Card==0)
+
+Graph$Card<-factor(Graph$Card,levels(Graph$Card)[c(1,4,3,2)])
+
+
+
+# Bar plot
+ggplot(Graph, aes(x=Block, y=M,  fill=Card)) + 
+  geom_bar(position=position_dodge(), stat="identity",
+           colour=NA) +
+  geom_errorbar(aes(ymin=M-SE, ymax=M+SE),
+                width=.2,
+                size=.8,
+                position=position_dodge(.9),
+                colour="gray20")+
+  xlab("Block") +
+  ylab("Chosen Deck(means)") +
+  scale_fill_manual(name="Card",
+                 values=c("goldenrod1", "brown1", "dodgerblue", "forestgreen")) +
+  ggtitle("Chosen Decks") +
+  scale_y_continuous(breaks=0:20*4) +
+  theme_bw()
+
+
+
 
 Data_sum2 <-Data_sum %>% dplyr::group_by(Block, Card) %>% dplyr::summarise(M=mean(N), SD=sd(N), SE=sd(N)/sqrt(sum(N)))
+
+
+
+
 
 pdf("data_sum2.pdf", height=11, width=8.5)
 grid.table(Data_sum2)
