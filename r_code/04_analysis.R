@@ -4,7 +4,7 @@
 # Load helper functions
 setwd("D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten")
 source('./r_functions/getPacks.R') # <- path to getPacks function
-
+source('./r_functions/flattenCorrMatrix.R')
 # Load necessary packages
 pkgs <- c('dplyr', 'plyr', 'Hmisc', 'multcomp', 'effects', 'phia', 'emmeans', 'lme4',
           'sjPlot', 'lmerTest', 'stargazer', 'lemon', 'gridExtra', 'ggplot2')
@@ -178,6 +178,10 @@ summary(m7)
 
 ####To do: same for subscales
 
+
+
+#Diagramm: each score on separate line 
+
 #-------Analysis: Personality and Block for RT------
 
 #MAE total Score
@@ -200,13 +204,99 @@ m7.2<-lm(RT~FFFS*Block, data=Data_full)
 anova(m7.2)
 summary(m7.2)
 
+m8<-lm(RT~MAE_Score+BIS+BAS_Score+FFFS, data=Data_full)
+summary(m8)
+
 
 ####To do: same for subscales!
 
 
 
-#---------Correlations in Personality data----------------------
-
-rcorr(as.matrix(Data_pers_score)) 
+#---------Correlations in Personality data: all----------------------
 
 
+Data_pers_score_all<- Data_pers_score %>% dplyr::select(PE, AC, SP, MAE_Score, FFFS, BIS, BAS_Rew_Int, BAS_Rew_Reac, BAS_Goal_Drive, BAS_Impulsiv, BAS_Score)
+
+matrix <- cor(Data_pers_score_all)
+round(matrix,2)
+
+matrix2<-rcorr(as.matrix(Data_pers_score_all))
+matrix2
+
+matrix2$r
+matrix2$P
+
+flattenCorrMatrix(matrix2$r, matrix2$P)
+rcorr(matrix, type=c("pearson"))
+matrix$r
+
+# Plot:  Insignificant correlation 
+corrplot(matrix2$r, method=c("number"), type="full", order="original", 
+         p.mat = matrix2$P, sig.level = 0.05, insig = "blank", tl.col="black", tl.srt=45)
+
+#Plot: full
+corrplot(matrix2$r, method=c("number"), type="full", order="original", tl.col="black", tl.srt=45)
+
+?corrplot
+
+#---------Correlations in Personality data: without subscales----------------------
+##problem: more than 4 Variables needed
+
+Data_pers_score_main<- Data_pers_score %>% dplyr::select(MAE_Score, FFFS, BIS, BAS_Score, VP)
+
+Data_pers_score_main$VP<- as.numeric(Data_pers_score_main$VP)
+matrix <- cor(Data_pers_score_main)
+round(matrix,2)
+
+matrix2<-rcorr(as.matrix(Data_pers_score_main))
+matrix2
+
+matrix2$r
+matrix2$P
+
+flattenCorrMatrix(matrix2$r, matrix2$P)
+rcorr(matrix, type=c("pearson"))
+matrix$r
+
+# Plot:  Insignificant correlation 
+corrplot(matrix2$r, method=c("number"), type="full", order="original", 
+         p.mat = matrix2$P, sig.level = 0.05, insig = "blank", tl.col="black", tl.srt=45)
+
+#Plot: full
+corrplot(matrix2$r, method=c("number"), type="full", order="original", tl.col="black", tl.srt=45)
+
+
+
+
+#-----Plotting by Person
+
+mplot <-c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30)
+BIS<-c(55,64,50,66,49,59,39,49,82,38,65,62,33,47,50,47,60,50,52,74,62,80,48,74,62,59,46,64,47,51)
+BAS<-c(103,101,100,87,77,84,96,80,70,103,88,85,81,88,98,91,105,76,91,84,86,91,85,87,95,89,70,97,70,94)
+FFFS<-c(25,29,34,33,12,24,17,21,32,21,17,18,11,14,21,21,27,15,18,22,14,25,21,30,23,12,20,24,12,22)
+MAE <-c(60,55,65,40,32,55,54,43,12,69,44,40,67,59,74,47,73,48,38,40,50,46,43,37,52,53,47,55,31,56)
+
+plot(mplot, BIS, type="o", col="blue", pch="o", lty=1, ylim = c(0,120),ylab="Personality_Score", xlab="Person")
+points(mplot, BAS, col="red", pch="*")
+lines(mplot, BAS, col="red", lty=2)
+points(mplot, FFFS, col="dark red", pch="+")
+lines(mplot, FFFS, col="dark red", lty=3)
+points(mplot, MAE, col="green", pch="#")
+lines(mplot, MAE, col="green", lty=4)
+legend(1,125,legend=c("BIS","BAS","FFFS","MAE"), col=c("blue","red","dark red", "green"),
+       pch=c("o","*","+", "#"),lty=c(1,2,3,4), ncol=4)
+
+
+rm(BAS,BIS,FFFS,MAE)
+
+
+#-------------IGT-Score-------------------------
+
+
+#((N von Card C)+ (N von Card D))- ((N von Card A) + (N von Card B)) je VP pro Block
+
+
+Data_score <- Data_sum %>% 
+  dplyr::group_by(VP, Block) %>% 
+  dplyr::summarise(N=) %>% 
+ 
