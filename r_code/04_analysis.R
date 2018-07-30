@@ -2,12 +2,13 @@
 #                                    June 2018 
 
 # Load helper functions
-setwd("D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten")
+setwd("")
 source('./r_functions/getPacks.R') # <- path to getPacks function
 source('./r_functions/flattenCorrMatrix.R')
 # Load necessary packages
 pkgs <- c('dplyr', 'plyr', 'Hmisc', 'multcomp', 'effects', 'phia', 'emmeans', 'lme4',
-          'sjPlot', 'lmerTest', 'stargazer', 'lemon', 'gridExtra', 'ggplot2')
+          'sjPlot', 'lmerTest', 'stargazer', 'lemon', 'gridExtra', 'ggplot2', 'tidyr',
+          'reshape2', 'corrplot')
 getPacks(pkgs)
 rm(pkgs)
 
@@ -71,9 +72,7 @@ dev.off()
   geom_text(aes(label = means), vjust = -0.3)
   
 
-#stargazer(Data_sum2, type='html', out='table1.htm')
 
-##Data_sum$score <- plyer::revalue(Data_sum$score= C+D - A+B)
 
 #--------Analysis: Anova RT by Block-----------------------------------------------
 
@@ -227,8 +226,9 @@ matrix2$r
 matrix2$P
 
 flattenCorrMatrix(matrix2$r, matrix2$P)
-rcorr(matrix, type=c("pearson"))
+rcorr(matrix, type=c("pearson"), )
 matrix$r
+
 
 # Plot:  Insignificant correlation 
 corrplot(matrix2$r, method=c("number"), type="full", order="original", 
@@ -242,7 +242,7 @@ corrplot(matrix2$r, method=c("number"), type="full", order="original", tl.col="b
 #---------Correlations in Personality data: without subscales----------------------
 ##problem: more than 4 Variables needed
 
-Data_pers_score_main<- Data_pers_score %>% dplyr::select(MAE_Score, FFFS, BIS, BAS_Score, VP)
+Data_pers_score_main<- Data_pers_score %>% dplyr::select(MAE_Score, FFFS, BIS, BAS_Score)
 
 Data_pers_score_main$VP<- as.numeric(Data_pers_score_main$VP)
 matrix <- cor(Data_pers_score_main)
@@ -290,13 +290,205 @@ legend(1,125,legend=c("BIS","BAS","FFFS","MAE"), col=c("blue","red","dark red", 
 rm(BAS,BIS,FFFS,MAE)
 
 
-#-------------IGT-Score-------------------------
+#-------------Calculating IGT-Score-------------------------
 
 
-#((N von Card C)+ (N von Card D))- ((N von Card A) + (N von Card B)) je VP pro Block
+#turning long into wide format
+Data_score <- dcast(Data_sum, VP + Block ~ Card, value.var="N")
+
+#Switching columns
+Data_score <- Data_score[c("VP", "Block", "A", "B", "C", "D")]
+
+#-------Calculating Score for each Block
+Data_score[is.na(Data_score)] <- 0
+Data_score<- dplyr::mutate(Data_score,IGT_Score=((C+D)-(A+B)))
+
+#-------Calculating total score
+Data_score_all <- Data_score %>% 
+  dplyr::group_by(VP) %>% 
+  dplyr::summarise(IGT_Score_all=sum(IGT_Score))
+
+#merge with personality scores
+Data_pers_score <- merge (Data_score_all, Data_pers_score, by.x = 'VP', by.y = 'VP')
+
+#-------Calculating score for Block 3
+Data_score_3<-dplyr::filter(Data_score, Block==3)
+Data_score_3<-dplyr::select(Data_score_3, VP,IGT_Score)
+
+#merge with personality scores
+Data_pers_score3 <- merge (Data_score_3, Data_pers_score, by.x = 'VP', by.y = 'VP')
 
 
-Data_score <- Data_sum %>% 
+#--------Select payoff at end of Block only
+Data_behav3<-Data_behav %>% dplyr::select(VP, Block,Trial, Payoff)
+Data_behav3<-dplyr::filter(Data_behav3, Trial==100)
+Data_behav3<-Data_behav3 %>% dplyr::select(VP, Block,Payoff)
+
+#merge with personality
+Data_reg <- merge (Data_score, Data_behav3)
+Data_reg <- merge (Data_reg, Data_pers_score, by.x = 'VP', , by.y = 'VP')
+
+#--------Calculating mean of RT for each Block
+Data_RT <- Data_behav %>% 
   dplyr::group_by(VP, Block) %>% 
-  dplyr::summarise(N=) %>% 
- 
+  dplyr::summarise(RT_sum=sum(RT)/100)
+
+#merge into final data frame for regression
+Data_reg <- merge (Data_reg, Data_RT)
+
+
+
+
+#-----------Regression Analysis-----------------
+
+#Total score by personality/RT in large data frame
+#merge into large data set
+Data_full2 <- merge (Data_score_all, Data_full, by.x = 'VP', by.y = 'VP')
+
+m1<-lm(IGT_Score_all~Block*BAS_Score*BIS*MAE_Score, data=Data_full2)
+summary(m4)
+
+m2<-lm(IGT_Score_all~RT, data=Data_full2)
+summary(m5)
+
+m3<-lm(IGT_Score_all~BAS_Score, data=Data_full2)
+summary(m6)
+
+#Score in small data frame
+m1<-lm(IGT_Score~Block,data=Data_score)                            
+summary(m1)
+anova(m1)
+
+m2<-lm(IGT_Score_all~MAE_Score, data=Data_pers_score_all)
+summary(m2)
+
+m3<-lm(IGT_Score_all~BAS_Score, data=Data_pers_score_all)
+summary(m3)
+
+
+#Block 3 Score in small data frame
+m1<-lm(IGT_Score~BIS,data=Data_pers_score3)                            
+summary(m1)
+
+m2<-lm(IGT_Score~MAE_Score, data=Data_pers_score3)
+summary(m2)
+
+m3<-lm(IGT_Score~BAS_Score, data=Data_pers_score3)
+summary(m3)
+
+#Score by Personality and Block in final Data frame
+m1<-lm(IGT_Score~Block*BAS_Score*BIS*FFFS*MAE_Score, data=Data_reg)
+summary(m1)
+anova(m1)
+
+m2<-lm(IGT_Score~Block*BAS_Rew_Int*BAS_Rew_Reac*BAS_Goal_Drive*BAS_Impulsiv, data=Data_reg)
+summary(m2)
+anova(m2)
+
+m3<-lm(IGT_Score~Block*MAE_Score*PE*AC*SP, data=Data_reg)
+summary(m3)
+anova(m3)
+
+#Split by Blocks
+Data_reg1<-dplyr::filter(Data_reg, Block==1)
+Data_reg2<-dplyr::filter(Data_reg, Block==2)
+Data_reg3<-dplyr::filter(Data_reg, Block==3)
+
+#Score by Personality in Block1
+m1<-lm(IGT_Score~BAS_Score*BIS*FFFS*MAE_Score, data=Data_reg1)
+summary(m1)
+anova(m1)
+
+m2<-lm(IGT_Score~BAS_Rew_Int*BAS_Rew_Reac*BAS_Goal_Drive*BAS_Impulsiv, data=Data_reg1)
+summary(m2)
+anova(m2)
+
+m3<-lm(IGT_Score~MAE_Score*PE*AC*SP, data=Data_reg1)
+summary(m3)
+anova(m3)
+
+#Score by Personality in Block2
+m1<-lm(IGT_Score~BAS_Score*BIS*FFFS*MAE_Score, data=Data_reg2)
+summary(m1)
+anova(m1)
+
+m2<-lm(IGT_Score~BAS_Rew_Int*BAS_Rew_Reac*BAS_Goal_Drive*BAS_Impulsiv, data=Data_reg2)
+summary(m2)
+anova(m2)
+
+m3<-lm(IGT_Score~MAE_Score*PE*AC*SP, data=Data_reg2)
+summary(m3)
+anova(m3)
+      
+#Score by Personality in Block3
+m1<-lm(IGT_Score~BAS_Score*BIS*FFFS*MAE_Score, data=Data_reg3)
+summary(m1)
+anova(m1)
+      
+m2<-lm(IGT_Score~BAS_Rew_Int*BAS_Rew_Reac*BAS_Goal_Drive*BAS_Impulsiv, data=Data_reg3)
+summary(m2)
+anova(m2)
+      
+m3<-lm(IGT_Score~MAE_Score*PE*AC*SP, data=Data_reg3)
+summary(m3)
+anova(m3)
+
+#Payoff by Personality in Block3
+m1<-lm(Payoff~BAS_Score*BIS*FFFS*MAE_Score, data=Data_reg3)
+summary(m1)
+anova(m1)
+      
+m2<-lm(Payoff~BAS_Rew_Int*BAS_Rew_Reac*BAS_Goal_Drive*BAS_Impulsiv, data=Data_reg3)
+summary(m2)
+anova(m2)
+      
+m3<-lm(Payoff~MAE_Score*PE*AC*SP, data=Data_reg3)
+summary(m3)
+anova(m3)
+
+#Score by RT 
+m4<-lm(IGT_Score~RT_sum, data=Data_reg)
+summary(m4)
+anova(m4)
+
+m5<-lm(IGT_Score~Block, data=Data_reg)
+summary(m5)
+anova(m5)
+
+#poweranalysis
+etasq(m1, anova=TRUE, partial =T) 
+
+#RT by Personality and Block in final Data frame
+m1<-lm(RT_sum~Block*BAS_Score*BIS*FFFS*MAE_Score, data=Data_reg)
+summary(m1)
+anova(m1)
+
+m2<-lm(RT_sum~Block*BAS_Rew_Int*BAS_Rew_Reac*BAS_Goal_Drive*BAS_Impulsiv, data=Data_reg)
+summary(m2)
+anova(m2)
+
+m3<-lm(RT_sum~Block*MAE_Score*PE*AC*SP, data=Data_reg)
+summary(m3)
+anova(m3)
+
+m4<-lm(RT_sum~Block, data = Data_reg)
+summary(m4)
+anova(m4)
+
+#-------------Correlation matrix including IGT Score------
+Data_pers_score_all<- Data_pers_score %>% dplyr::select(PE, AC, SP, MAE_Score, FFFS, BIS, BAS_Rew_Int, BAS_Rew_Reac, BAS_Goal_Drive, BAS_Impulsiv, BAS_Score, IGT_Score_all) 
+
+matrix2<-rcorr(as.matrix(Data_pers_score_all))
+
+corrplot(matrix2$r, method=c("number"), type="full", order="original", 
+         p.mat = matrix2$P, sig.level = 0.05, insig = "blank", tl.col="black", tl.srt=45)                 
+
+
+#----------------RT after losses-------------------------
+
+Data_RT_loss<-dplyr::select(Data_full, VP, Block, RT, net_payoff)
+Data_RT_loss<-dplyr::filter(Data_RT_loss, net_payoff<0)
+Data_RT_loss<-dplyr::lag(Data_RT_loss$net_payoff<0)
+Data_RT_win<-dplyr::filter(Data_RT_loss,net_payoff>0)
+
+?lag
