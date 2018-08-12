@@ -4,7 +4,7 @@
 
 
 # Load helper functions
-setwd("")
+setwd("n")
 source('./r_functions/getPacks.R') # <- path to getPacks function
 
 # Load necessary packages
@@ -315,3 +315,5 @@ names(Data_B3)[9:11] <- c('gain','loss', 'net_payoff')
 
 Data_card<-rbind(Data_B1, Data_B2, Data_B3)
 rm(Data_B1, Data_B2, Data_B3)
+print(levels(Data_card$Card)) 
+Data_card$Card = factor(Data_card$Card,levels(Data_card$Card)[c(2,5,4,3,1)])

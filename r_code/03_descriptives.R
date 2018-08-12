@@ -34,7 +34,7 @@ boxplot(Data_card$Payoff)
 
 
 
-## ---------Part B: Personality data-------------------------
+## ----------Part B: Personality data-------------------------
 
 # means, standard deviation
 mean(Data_pers_score$MAE_Score)
@@ -86,5 +86,29 @@ SD01_per <- Data_pers_full %>%
 SD09_01_per <- Data_pers_full %>% 
   count('SD09_01') %>%            
   mutate(per = freq/sum(freq)*100)
+
+##Gambling experience
+Data_gambling<-dplyr::select(Data_pers_full, VP, GA21_01:GA21_09)
+
+Data_gambling<- dplyr::mutate(Data_gambling,Score_total=(GA21_01 + GA21_02 + GA21_03 + 
+                                                           GA21_04 + GA21_05 + GA21_06 +
+                                                           GA21_07 + GA21_08 + GA21_09))
+
+Data_gambling$Score_total<-as.factor(Data_gambling$Score_total)
+Data_gambling$Score_final <- plyr::revalue(Data_gambling$Score_total, c('9' = '0', '10'='1','11'='2', '12'='3', '12'='4'))
+
+count(Data_gambling, 'Score_final')
+
+#1= Nein, 2=Ja. 
+
+
+# Check normal distribution 
+plotNormalHistogram(Data_reg$RT_log)
+
+plotNormalHistogram(Data_reg$IGT_Score)
+
+plotNormalHistogram(Data_reg$Payoff)
+
+plotNormalHistogram(Data_full$RT)
 
 
