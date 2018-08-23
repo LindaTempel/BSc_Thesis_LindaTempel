@@ -4,7 +4,7 @@
 
 
 # Load helper functions
-setwd("")
+setwd("D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten")
 source('./r_functions/getPacks.R') # <- path to getPacks function
 
 # Load necessary packages

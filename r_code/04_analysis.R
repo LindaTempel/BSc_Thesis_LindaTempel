@@ -2,14 +2,14 @@
 #                                    June 2018 
 
 # Load helper functions
-setwd("")
+setwd("D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten")
 source('./r_functions/getPacks.R') # <- path to getPacks function
 source('./r_functions/flattenCorrMatrix.R')
 # Load necessary packages
 pkgs <- c('dplyr', 'plyr', 'Hmisc', 'multcomp', 'effects', 'phia', 'emmeans', 'lme4',
           'sjPlot', 'lmerTest', 'stargazer', 'lemon', 'gridExtra', 'ggplot2', 'tidyr',
           'reshape2', 'corrplot', 'visreg', 'pwr', 'lattice', 'viridis', 'rcompanion',
-          'apaTables')
+          'apaTables', 'scales')
 getPacks(pkgs)
 rm(pkgs)
 
@@ -490,8 +490,12 @@ m1<-lmer(IGT_Score ~
          + (1|VP), data=Data_reg, REML = F)
 anova(m1)
 
-visreg(m1, xvar = 'MAE_Score', by='Block')
-visreg(m1, xvar = 'BIS', by='Block')
+visreg(m1, xvar = 'MAE_Score', by='Block', line=list(col='#2D718EFF'),
+       gg=T) + theme_bw()+ ggtitle("Interaktion MAE und Block")
+
+visreg(m1, xvar = 'BIS', by='Block', line=list(col='#2D718EFF'),
+       gg=T) + theme_bw()+ ggtitle("Interaktion BIS und Block")
+
 
 m1_1<-lmer(IGT_Score ~ Block + BAS_Score + BIS + 
            + FFFS + MAE_Score + (1|VP),
@@ -506,9 +510,13 @@ m2<-lmer(IGT_Score ~
          Block*BAS_Impulsiv + (1|VP), data=Data_reg, REML=F)
 anova(m2)
 
-visreg(m2, xvar = 'BAS_Goal_Drive', by='Block')
-visreg(m2, xvar = 'BAS_Rew_Int', by='Block')
-visreg(m2)
+visreg(m2, xvar = 'BAS_Goal_Drive', by='Block',line=list(col='#2D718EFF'),
+       gg=T) + theme_bw()+ ggtitle("Interaktion Goal-Drive und Block")
+
+visreg(m2, xvar = 'BAS_Rew_Int', by='Block',line=list(col='#2D718EFF'),
+       gg=T) + theme_bw()+ ggtitle("Interaktion Reward Interest und Block")
+
+visreg(m2,line=list(col='#2D718EFF'), main="Reward Interest")
 
 m2_1<-lmer(IGT_Score ~ Block +
            BAS_Rew_Int +
@@ -525,7 +533,9 @@ m3<-lmer(IGT_Score ~
          (1|VP), data=Data_reg, REML=F)
 anova(m3)
 
-visreg(m3, xvar = 'SP', by='Block')
+visreg(m3, xvar = 'SP', by='Block',line=list(col='#2D718EFF'),
+       gg=T) + theme_bw()+ ggtitle("Interaktion Social Potency und Block")
+
 
 m3_1<-lmer(IGT_Score ~ Block + PE + AC +  (1| VP), 
          data=Data_reg)
@@ -541,9 +551,12 @@ anova(m1)
 emmeans(m1, pairwise~Block|BIS, adjust='Bonferroni')
 emmeans(m1, pairwise~Block|MAE_Score, adjust='Bonferroni')
 
-visreg(m1, by='Block')
-visreg(m1, xvar = 'MAE_Score', by='Block')
-visreg(m1, xvar = 'BIS', by='Block')
+visreg(m1, xvar = 'MAE_Score', by='Block',line=list(col='#20A386FF'),
+       gg=T) + theme_bw()+ ggtitle("Interaktion MAE und Block")
+
+visreg(m1, xvar = 'BIS', by='Block',line=list(col='#20A386FF'),
+       gg=T) + theme_bw()+ ggtitle("Interaktion BIS und Block")
+
 
 m1_1<-lmer(Payoff~Block+BAS_Score+BIS+FFFS+MAE_Score
            +(1|VP), data=Data_reg)
@@ -556,6 +569,8 @@ m2<-lmer(Payoff~Block*BAS_Rew_Int+
 anova(m2)
 visreg(m2)
 
+visreg(m2,line=list(col='#20A386FF'),main="Goal-Drive")
+
 m2_1<-lmer(Payoff~Block+BAS_Rew_Int+BAS_Rew_Reac+
             BAS_Goal_Drive+BAS_Impulsiv + 
             (1|VP), data=Data_reg)
@@ -566,8 +581,8 @@ m3<-lmer(Payoff~Block*PE+
            Block*SP+(1|VP), data=Data_reg, REML=F)
 anova(m3)
 
-visreg(m3, xvar = 'SP', by='Block')
-
+visreg(m3, xvar = 'SP', by='Block',line=list(col='#20A386FF'),
+       gg=T) + theme_bw()+ ggtitle("Interaktion Social Potency und Block")
 
 m3_1<-lmer(Payoff~Block+PE+AC+SP+
              (1|VP), data=Data_reg)
@@ -819,7 +834,11 @@ m4<-lmer(RT_log~Block + (1|VP), data = Data_reg, REML = F)
 summary(m4)
 anova(m4)
 emmeans(m4, pairwise ~ Block, adjust='Bonferroni')
-visreg(m4)
+
+visreg(m4, xvar = 'RT_log', by='Block',line=list(col='#481568FF'),
+       gg=T) + theme_bw()+ ggtitle("Reaktionszeit")+ theme(axis.title.x=element_blank(),
+      axis.text.x=element_blank(),
+      axis.ticks.x=element_blank())
 
 #HLM with Intercept
 
@@ -831,6 +850,7 @@ m1<-lmer(RT_log ~
 anova(m1)
 
 visreg(m1)
+visreg(m1,line=list(col='#481568FF'),main="Block")
 
 m1_1<-lmer(RT_log ~ 
              Block + BAS_Score +
@@ -846,7 +866,8 @@ m2<-lmer(RT_log ~
            Block*BAS_Impulsiv + (1|VP), data=Data_reg, REML = F)
 anova(m2)
 
-visreg(m2, xvar = 'BAS_Rew_Int', by='Block')
+visreg(m2, xvar = 'BAS_Rew_Int', by='Block',line=list(col='#481568FF'),
+       gg=T) + theme_bw()+ ggtitle("Interaktion Reward Interest und Block")
 
 m2_1<-lmer(RT_log ~ 
              Block + BAS_Rew_Int + 
@@ -862,7 +883,6 @@ m3<-lmer(RT_log ~
            Block*SP + (1|VP), data=Data_reg, REML = F)
 anova(m3)
 
-visreg(m3, xvar = 'SP', by='Block')
 
 m3_1<-lmer(RT_log ~ 
              Block  +
@@ -928,7 +948,10 @@ m1<-lmer(RT_log ~  Cond * Card + Card * Block + Cond * Block+
 anova(m1)
 
 emmeans(m1, pairwise ~ Block | Cond, adjust='Bonferroni')
-emmip(m1, ~Card|Cond|Block, CIs=T)
+emmeans(m1, pairwise ~ Cond | Block, adjust='Bonferroni')
+emmip(m1,~Cond|Block, CIs=T, engine ="ggplot",line=list(col='#481568FF')) + theme_bw() 
+#ändert Farbe nicht, aber Code läuft
+emmip(m1, ~Card|Cond|Block, CIs=T)+ theme_bw()
 summary(m1)
 
 #--------Poweranalysis-------------------
@@ -962,9 +985,29 @@ visreg(m1)
 
 #--------Regression tables------------------
 
-apa.reg.table(m1, filename = "\\Table1.doc", table.number = 1)
-apa.aov.table(mod_card, filename = "\\Table1.doc", table.number = 1)
+#IGT-Score
+apa.reg.table(m1_1, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table11.doc", table.number = 1)
+apa.reg.table(m2_1, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table12.doc", table.number = 2)
+apa.reg.table(m3_1, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table13.doc", table.number = 3)
+apa.aov.table(m1_1, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table11a.doc", table.number = 1)
+apa.aov.table(m2_1, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table12a.doc", table.number = 2)
+apa.aov.table(m3_1, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table13a.doc", table.number = 3)
 
+#Payoff
+apa.reg.table(m1, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table21.doc", table.number = 1)
+apa.reg.table(m2_1, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table22.doc", table.number = 2)
+apa.reg.table(m3, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table23.doc", table.number = 3)
+apa.aov.table(m1, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table21a.doc", table.number = 1)
+apa.aov.table(m2_1, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table22a.doc", table.number = 2)
+apa.aov.table(m3, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table23a.doc", table.number = 3)
+
+#RT_mean
+apa.reg.table(m1_1, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table31.doc", table.number = 1)
+apa.reg.table(m2_1, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table32.doc", table.number = 2)
+apa.reg.table(m3_1, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table33.doc", table.number = 3)
+apa.aov.table(m1_1, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table31a.doc", table.number = 1)
+apa.aov.table(m2_1, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table32a.doc", table.number = 2)
+apa.aov.table(m3_1, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table33a.doc", table.number = 3)
 
 #--------Partial Correlation----------------
 
@@ -972,7 +1015,7 @@ cor(Data_reg$IGT_Score, Data_reg$BAS_Score)
 cor.test(Data_reg$IGT_Score, Data_reg$BAS_Score)
 pcor.test(Data_reg$IGT_Score,Data_reg$BAS_Score,Data_reg[c("RT_mean")])
           
-
+?apaTables
 
 
 
