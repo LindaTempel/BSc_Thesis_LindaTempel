@@ -13,173 +13,7 @@ pkgs <- c('dplyr', 'plyr', 'Hmisc', 'multcomp', 'effects', 'phia', 'emmeans', 'l
 getPacks(pkgs)
 rm(pkgs)
 
-
-#--------Merge behavioral and personality data---------
-Data_full<- merge (Data_card, Data_pers_full, by.x='VP', by.y = 'VP')
-
-Data_full$Block<-as.factor(Data_full$Block)
-
-
-#--------Data frame for frequency of cards---------
-
-Data_sum <- Data_full %>% 
-  dplyr::group_by(VP, Block, Card) %>% 
-  dplyr::summarise(N=sum(!is.na(Card))) %>% 
-  dplyr::filter(!Card==0)
-
-
-#--------Calculating IGT-Score, RT mean and Payoff-------------------------
-  
-#turning long into wide format
-Data_score <- dcast(Data_sum, VP + Block ~ Card, value.var="N")
-  
-#Switching columns
-Data_score <- Data_score[c("VP", "Block", "A", "B", "C", "D")]
-  
-#-------Calculating Score for each Block
-Data_score[is.na(Data_score)] <- 0
-Data_score<- dplyr::mutate(Data_score,IGT_Score=((C+D)-(A+B)))
-  
-#--------Select payoff at end of Block only
-Data_behav3<-Data_behav %>% dplyr::select(VP, Block,Trial, Payoff)
-Data_behav3<-dplyr::filter(Data_behav3, Trial==100)
-Data_behav3<-Data_behav3 %>% dplyr::select(VP, Block,Payoff)
-  
-#merge with personality
-Data_reg <- merge (Data_score, Data_behav3)
-Data_reg <- merge (Data_reg, Data_pers_score, by.x = 'VP', by.y = 'VP')
-  
-#--------Calculating mean of RT for each Block
-Data_RT <- Data_card %>% 
-    dplyr::group_by(VP, Block) %>% 
-    dplyr::summarise(RT_mean=mean(RT))
-  
-#merge into final data frame for regression
-Data_reg <- merge (Data_reg, Data_RT)
-
-#Log Transformation for RT
-Data_reg$RT_log = log(Data_reg$RT_mean)
-
-
-##-------Calculating total score
-Data_score_all <- Data_score %>% 
-    dplyr::group_by(VP) %>% 
-    dplyr::summarise(IGT_Score_all=sum(IGT_Score))
-  
-#merge with personality scores
-Data_pers_score_all <- merge (Data_score_all, Data_pers_score)  
-
-#--------Alternative: bigger data set for Analysis with slopes------
-
-Data_RT_all <- Data_card %>% 
-    dplyr::group_by(VP, Block, Card) %>% 
-    dplyr::summarise(RT_mean=mean(RT)) %>%
-    dplyr::filter(!Card==0)
-
-perso <- dplyr::select(Data_pers_score, BAS_Score, MAE_Score, BIS, FFFS, 
-                         PE, AC, SP, BAS_Rew_Int, 
-                         BAS_Rew_Reac, BAS_Goal_Drive, BAS_Impulsiv, VP)
-Data_reg_all <- merge(Data_sum, perso, 'VP')
-Data_reg_all <-merge(Data_reg_all, Data_RT_all)
-Data_reg_all <-merge(Data_reg_all, Data_score)
-Data_reg_all <- merge (Data_reg_all, Data_behav3)
-Data_reg_all$VP <-as.factor(Data_reg_all$VP)  
-
-Data_reg_all$RT_log = log(Data_reg_all$RT_mean)
-
-  
-
-  
-  
-  
-
-
-#--------Data frame for RT after losses/wins---------
-
-Data_RT_split<-dplyr::select(Data_full, VP, Block, RT, Card, net_payoff)
-
-Data_RT_split<-dplyr::filter(Data_RT_split, Card %in% c('A', 'B', 'C', 'D'))
-Data_RT_split$Card <- factor(Data_RT_split$Card)
-
-Data_RT_loss <- dplyr::filter(Data_RT_split, lag(net_payoff, 1)<0)
-Data_RT_win <- dplyr::filter(Data_RT_split, lag(net_payoff,1)>0)
-
-Data_RT_loss$Cond<-c("loss")
-Data_RT_win$Cond<-c("win")
-
-Data_loss_win<-rbind(Data_RT_loss, Data_RT_win)
-
-Data_loss_win$Cond <- as.factor(Data_loss_win$Cond)
-Data_loss_win$VP <- as.factor(Data_loss_win$VP)
-
-Data_loss_win <- Data_loss_win %>% 
-  dplyr::group_by(VP, Block, Card, Cond) %>% 
-  dplyr::summarise(RT_mean=mean(RT))
-
-#--------Bar plot frequency of cards -----------------
-  
-Graph <- Data_sum %>% 
-  dplyr::group_by(Block, Card) %>% 
-  dplyr::summarise(M=mean(N), SD=sd(N), SE=sd(N)/sqrt(sum(!is.na(N))))%>%
-  dplyr::filter(!Card==0)
-  
-ggplot(Graph, aes(x=Block, y=M,  fill=Card)) + 
-  geom_bar(position=position_dodge(), stat="identity",
-             colour=NA) +
-  geom_errorbar(aes(ymin=M-SE, ymax=M+SE),
-                  width=.2,
-                  size=.8,
-                  position=position_dodge(.9),
-                  colour="gray20")+
-  xlab("Block") +
-  ylab("Chosen Deck(means)") +
-  scale_fill_viridis(option="viridis", discrete = T) +
-  ggtitle("Chosen Decks") +
-  scale_y_continuous(breaks=0:20*4) +
-  theme_bw()
-  
-  
-#ggplot(Data_sum2, aes(x = Card, y = M)) 
-geom_bar(fill = "#0073C2FF", stat = "identity") 
-geom_text(aes(label = means), vjust = -0.3)
-  
-  
-#--------HLM RT by Block and VP----------
-
-# Model 1
-fm1 <- lmer(RT ~ Block + (1 | VP), data=Data_full, REML = F)
-summary(fm1)
-anova(fm1)
-
-# Model 2
-fm2 <- lmer(RT ~ Block + (1+ Block | VP), data=Data_full, REML = F)
-summary(fm2)
-anova(fm2)
-
-# Model 3
-fm3 <- lmer(RT ~ Block + (1 | VP/Block), data=Data_full, REML = F)
-anova(fm3)
-summary(fm3)
-
-# Compare models to determine best fit
-anova(fm1, fm2, fm3)
-
-# plotting random effects
-sjp.lmer(fm3, y.offset = .4)
-
-sjp.lmer(fm3,
-         facet.grid = F,
-         sort.est = 'sort.all',
-         y.offset = .4)
-
-sjp.lmer(fm3, type = "ri.slope")
-
-sjp.lmer(fm1, type = "rs.ri", vars = "Block", sample.n = 30)
-
-sjp.lmer(fm3, 
-         type = "rs.ri", 
-         vars = "Block",
-         facet.grid = FALSE)
+#Personality Data
 
 #--------Correlations in Personality data----------------------
 
@@ -189,16 +23,28 @@ Data_pers_score_all<- Data_pers_score %>% dplyr::select(PE, AC, SP, MAE_Score, F
 matrix <- cor(Data_pers_score_all)
 round(matrix,2)
 
-matrix2<-rcorr(as.matrix(Data_pers_score_all))
+#Switching columns
+Data_pers_score_all <- Data_pers_score_all[c("MAE_Score", "PE", "AC", "SP", "FFFS", "BIS", "BAS_Score",
+                                             "BAS_Rew_Int", "BAS_Rew_Reac", "BAS_Goal_Drive", "BAS_Impulsiv")]
+
+matrix2<-rcorr(as.matrix(Data_pers_score_all), type=c("pearson"))
+
+#for p-values
 matrix2
 
 matrix2$r
 matrix2$P
 
 flattenCorrMatrix(matrix2$r, matrix2$P)
-rcorr(matrix, type=c("pearson"), )
-matrix$r
+rcorr(matrix, type=c("pearson"))
+matrix$P
 
+colnames(matrix2$r) <- c("Extraversion", "Wohlbefinden", "Leistung", "Soziale Stärke", 
+                         "FFFS", "BIS", "BAS", "Interesse a.B.", 
+                         "Reaktivität a.B.", "z. Beharrlichkeit", "Impulsivität")
+rownames(matrix2$r) <- c("Extraversion", "Wohlbefinden", "Leistung", "Soziale Stärke", 
+                         "FFFS", "BIS", "BAS", "Interesse a.B", 
+                         "Reaktivität a.B.", "z. Beharrlichkeit", "Impulsivität")
 
 # Plot:  Insignificant correlation 
 corrplot(matrix2$r, method=c("number"), type="full", order="original", 
@@ -209,922 +55,398 @@ corrplot(matrix2$r, method=c("number"), type="full", order="original", tl.col="b
 
 
 
-#--------Plot Personality Scores by Person------
 
-mplot <-c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30)
-BIS<-c(55,64,50,66,49,59,39,49,82,38,65,62,33,47,50,47,60,50,52,74,62,80,48,74,62,59,46,64,47,51)
-BAS<-c(103,101,100,87,77,84,96,80,70,103,88,85,81,88,98,91,105,76,91,84,86,91,85,87,95,89,70,97,70,94)
-FFFS<-c(25,29,34,33,12,24,17,21,32,21,17,18,11,14,21,21,27,15,18,22,14,25,21,30,23,12,20,24,12,22)
-MAE <-c(60,55,65,40,32,55,54,43,12,69,44,40,67,59,74,47,73,48,38,40,50,46,43,37,52,53,47,55,31,56)
+#Behavioral Data
 
-plot(mplot, BIS, type="o", col="blue", pch="o", lty=1, ylim = c(0,120),ylab="Personality_Score", xlab="Person")
-points(mplot, BAS, col="red", pch="*")
-lines(mplot, BAS, col="red", lty=2)
-points(mplot, FFFS, col="dark red", pch="+")
-lines(mplot, FFFS, col="dark red", lty=3)
-points(mplot, MAE, col="green", pch="#")
-lines(mplot, MAE, col="green", lty=4)
-legend(1,125,legend=c("BIS","BAS","FFFS","MAE"), col=c("blue","red","dark red", "green"),
-       pch=c("o","*","+", "#"),lty=c(1,2,3,4), ncol=4)
+#Behavioral Data
 
+#---------------Chosen Decks----------------
 
-rm(BAS,BIS,FFFS,MAE)
-
-#Standardize values
-
-BAS_z <- scale (Data_pers_score$BAS_Score)
-BIS_z <- scale (Data_pers_score$BIS)
-FFFS_z <- scale (Data_pers_score$FFFS)
-MAE_z <- scale (Data_pers_score$MAE_Score)
-
-
-show_col(viridis_pal()(20))
-
-plot(mplot, BIS_z, type="o", col="#482878FF", pch="o", lty=1,lwd=2, ylim = c(-5,5),ylab="Personality_Score", xlab="Person")
-points(mplot, BAS_z, col="#2D718EFF", pch="o")
-lines(mplot, BAS_z, col="#2D718EFF", lty=1, lwd=2)
-points(mplot, FFFS_z, col="#29AF7FFF", pch="o")
-lines(mplot, FFFS_z, col="#29AF7FFF", lty=1, lwd=2)
-points(mplot, MAE_z, col="#B8DE29FF", pch="o")
-lines(mplot, MAE_z, col="#B8DE29FF", lty=1, lwd=2)
-legend(1,5,legend=c("BIS","BAS","FFFS","MAE"), col=c("#482878FF","#2D718EFF","#29AF7FFF", "#B8DE29FF"),
-       pch=c("o","o","o", "o"),lty=c(1,1,1,1), ncol=4)
-
-#--------Correlation matrix including IGT Score------
-
-Data_pers_score_all<- Data_pers_score %>% dplyr::select(PE, AC, SP, MAE_Score, FFFS, BIS, BAS_Rew_Int, BAS_Rew_Reac, BAS_Goal_Drive, BAS_Impulsiv, BAS_Score, IGT_Score_all) 
-
-matrix2<-rcorr(as.matrix(Data_pers_score_all))
-
-corrplot(matrix2$r, method=c("number"), type="full", order="original", 
-         p.mat = matrix2$P, sig.level = 0.05, insig = "blank", tl.col="black", tl.srt=45)                 
-
-#--------HLM-Card by Block and Card-----------------------------
-
-mod_card <- lm(N ~ Card*Block, data=Data_reg_all)
-car::Anova(mod_card,type=3)
-emmeans(mod_card, pairwise ~ Card, adjust='Bonferroni')
-   
-     
 mod_card <- lmer(N ~ Card*Block + (1+Card|VP), data=Data_reg_all, REML = F)
+summary(mod_card)
 anova(mod_card)
 AIC(mod_card)
 emmeans(mod_card, pairwise ~ Card |Block, adjust='Bonferroni')
 
 visreg(mod_card,'Card', by='Block')
 
-mf<-allEffects((mod_card))
-plot(mf)
-
-plot.emm():
-mod_card <- lmer(N ~ Card*Block + (1|VP/Card), data=Data_reg_all, REML= F)
-AIC(mod_card)
-
-emmip(mod_card, Block ~ Card)
-emmip(mod_card, Block ~ Card | Block, CIs=T)
-
-#--------Regression: IGT Score by Personality and Block -----
-
-m1<-lm(IGT_Score ~ 
-         Block*BAS_Score + 
-         Block*BIS + 
-         Block*FFFS + 
-         Block*MAE_Score, data=Data_reg)
-summary(m1)
-car::Anova(m1, type=3)
+resid(mod_card)
+car::qqPlot(resid(mod_card))
 
 
-m1_1<-lm(IGT_Score ~ Block + BAS_Score + BIS + 
-         + FFFS + MAE_Score,
-       data=Data_reg)
-summary(m1_1)
-car::Anova(m1_1, type=3)
-visreg(m1_1)
-
-
-m2<-lm(IGT_Score ~ 
-         Block*BAS_Rew_Int +
-         Block*BAS_Rew_Reac +
-         Block*BAS_Goal_Drive +
-         Block*BAS_Impulsiv, data=Data_reg)
-summary(m2)
-car::Anova(m2, type=3)
-
-m2_1<-lm(IGT_Score ~ Block +
-         BAS_Rew_Int +
-         BAS_Rew_Reac +
-         BAS_Goal_Drive +
-         BAS_Impulsiv, data=Data_reg)
-car::Anova(m2_1, type=3)
-visreg(m2_1)
-
-m3<-lm(IGT_Score ~   
-         Block*PE + 
-         Block*AC + 
-         Block*SP, 
-         data=Data_reg)
-summary(m3)
-car::Anova(m3,type=3)
-
-m3_1<-lm(IGT_Score ~ Block + PE + AC + SP, 
-       data=Data_reg)
-car::Anova(m3_1,type=3)
-visreg(m3_1)
-
-#Score by RT and by Block only
-m4<-lm(IGT_Score~RT_mean, data=Data_reg)
-summary(m4)
-car::Anova(m4,type=3)
-
-m5<-lm(IGT_Score~Block, data=Data_reg)
-summary(m5)
-car::Anova(m5,type=3)
-
-m5<-lmer(IGT_Score~Block + (1|VP), data=Data_reg)
-anova(m5)
-emmeans(m5, pairwise ~ Block, adjust='fdr')
-visreg(m5)
-
-#--------Regression: Payoff by Personality----------------------
-
-cor.test(Data_reg$Payoff, Data_reg$IGT_Score)
-
-m1<-lm(Payoff~Block*BAS_Score+
-         Block*BIS+
-         Block*FFFS+
-         Block*MAE_Score, data=Data_reg)
-car::Anova(m1,type=3)
-
-m1_1<-lm(Payoff~Block+BAS_Score+BIS+FFFS+MAE_Score, data=Data_reg)
-car::Anova(m1_1,type=3)
-
-
-m2<-lm(Payoff~Block*BAS_Rew_Int+ 
-         Block*BAS_Rew_Reac+ 
-         Block*BAS_Goal_Drive+
-         Block*BAS_Impulsiv, data=Data_reg)
-car::Anova(m2,type=3)
-
-m2_1<-lm(Payoff~Block+BAS_Rew_Int+BAS_Rew_Reac+BAS_Goal_Drive+BAS_Impulsiv, data=Data_reg)
-car::Anova(m2_1,type=3)
-
-
-m3<-lm(Payoff~Block*PE+
-         Block*AC+
-         Block*SP, data=Data_reg)
-car::Anova(m3,type=3)
-
-m3_1<-lm(Payoff~Block+PE+AC+SP, data=Data_reg)
-car::Anova(m3_1,type=3)
-
-
-#--------Regression: RT_mean by Personality and Block----------
-
-m1<-lm(RT_mean ~ 
-          Block*BAS_Score +
-          Block*BIS + 
-          Block*FFFS +
-          Block*MAE_Score, data=Data_reg)
-summary(m1)
-car::Anova(m1,type=3)
-
-m1_1<-lm(RT_mean ~ 
-         Block + BAS_Score +
-         BIS + 
-         FFFS +
-         MAE_Score, data=Data_reg)
-car::Anova(m1_1,type=3)
-
-visreg(m1_1)
-
-m2<-lm(RT_mean ~ 
-         Block*BAS_Rew_Int + 
-         Block*BAS_Rew_Reac + 
-         Block*BAS_Goal_Drive + 
-         Block*BAS_Impulsiv, data=Data_reg)
-summary(m2)
-car::Anova(m2,type=3)
-
-m2_1<-lm(RT_mean ~ 
-         Block + BAS_Rew_Int + 
-         BAS_Rew_Reac + 
-         BAS_Goal_Drive + 
-         BAS_Impulsiv, data=Data_reg)
-car::Anova(m2_1,type=3)
-visreg(m2_1)
-      
-m3<-lm(RT_mean ~ 
-         Block*PE +
-         Block*AC +
-         Block*SP, data=Data_reg)
-summary(m3)
-car::Anova(m3, type=3)
-
-m3_1<-lm(RT_mean ~ 
-         Block  +
-         PE + AC + SP, data=Data_reg)
-car::Anova(m3_1, type=3)
-visreg(m3_1)
-
-m4<-lmer(RT_mean~Block + (1|VP), data = Data_reg, REML=F)
-summary(m4)
-anova(m4)
-emmeans(m4, pairwise ~ Block, adjust='Bonferroni')
-
-visreg(m4)
-
-#--------Regression: IGT-Score by RT and Personality--------------
-
-m1<-lm(IGT_Score ~ 
-         RT_mean*BAS_Score + 
-         RT_mean*BIS + 
-         RT_mean*FFFS + 
-         RT_mean*MAE_Score, data=Data_reg)
-summary(m1)
-car::Anova(m1,type=3)
-
-
-m1_1<-lm(IGT_Score ~ RT_mean + BAS_Score + BIS + 
-           + FFFS + MAE_Score,
-         data=Data_reg)
-summary(m_1_1)
-car::Anova(m1_1,type=3)
-
-
-m2<-lm(IGT_Score ~ 
-         RT_mean*BAS_Rew_Int +
-         RT_mean*BAS_Rew_Reac +
-         RT_mean*BAS_Goal_Drive +
-         RT_mean*BAS_Impulsiv, data=Data_reg)
-summary(m2)
-car::Anova(m2,type=3)
-
-m2_2<-lm(IGT_Score ~ RT_mean +
-           BAS_Rew_Int +
-           BAS_Rew_Reac +
-           BAS_Goal_Drive +
-           BAS_Impulsiv, data=Data_reg)
-car::Anova(m2_2,type=3)
-
-
-m3<-lm(IGT_Score ~   
-         RT_mean*PE + 
-         RT_mean*AC + 
-         RT_mean*SP, 
-       data=Data_reg)
-summary(m3)
-car::Anova(m3,type=3)
-
-m3_1<-lm(IGT_Score ~ RT_mean + PE + AC + SP, 
-         data=Data_reg)
-
-car::Anova(m3_1,type=3)
-
-#--------HLM: IGT-Score by Personality and Block-----
+#---------------IGT-Score---------------------
 
 m1<-lmer(IGT_Score ~ 
-         Block*BAS_Score + 
-         Block*BIS + 
-         Block*FFFS + 
-         Block*MAE_Score
+           Block*BAS_Score_z + 
+           Block*BIS_z + 
+           Block*FFFS_z + 
+           Block*MAE_Score_z
          + (1|VP), data=Data_reg, REML = F)
 anova(m1)
-
-visreg(m1, xvar = 'MAE_Score', by='Block', line=list(col='#2D718EFF'),
-       gg=T) + theme_bw()+ ggtitle("Interaktion MAE und Block")
-
-visreg(m1, xvar = 'BIS', by='Block', line=list(col='#2D718EFF'),
-       gg=T) + theme_bw()+ ggtitle("Interaktion BIS und Block")
-
-
-m1_1<-lmer(IGT_Score ~ Block + BAS_Score + BIS + 
-           + FFFS + MAE_Score + (1|VP),
-         data=Data_reg)
-anova(m1_1)
-
-
-m2<-lmer(IGT_Score ~ 
-         Block*BAS_Rew_Int +
-         Block*BAS_Rew_Reac +
-         Block*BAS_Goal_Drive +
-         Block*BAS_Impulsiv + (1|VP), data=Data_reg, REML=F)
-anova(m2)
-
-visreg(m2, xvar = 'BAS_Goal_Drive', by='Block',line=list(col='#2D718EFF'),
-       gg=T) + theme_bw()+ ggtitle("Interaktion Goal-Drive und Block")
-
-visreg(m2, xvar = 'BAS_Rew_Int', by='Block',line=list(col='#2D718EFF'),
-       gg=T) + theme_bw()+ ggtitle("Interaktion Reward Interest und Block")
-
-visreg(m2,line=list(col='#2D718EFF'), main="Reward Interest")
-
-m2_1<-lmer(IGT_Score ~ Block +
-           BAS_Rew_Int +
-           BAS_Rew_Reac +
-           BAS_Goal_Drive +
-           BAS_Impulsiv + (1|VP), data=Data_reg)
-anova(m2_1)
-
-
-m3<-lmer(IGT_Score ~   
-         Block*PE + 
-         Block*AC + 
-         Block*SP+
-         (1|VP), data=Data_reg, REML=F)
-anova(m3)
-
-visreg(m3, xvar = 'SP', by='Block',line=list(col='#2D718EFF'),
-       gg=T) + theme_bw()+ ggtitle("Interaktion Social Potency und Block")
-
-
-m3_1<-lmer(IGT_Score ~ Block + PE + AC +  (1| VP), 
-         data=Data_reg)
-anova(m3_1)
-
-#--------HLM: Payoff by Personality and Block-----
-
-m1<-lmer(Payoff~Block*BAS_Score+
-           Block*BIS+
-           Block*FFFS+
-           Block*MAE_Score+ (1|VP), data=Data_reg, REML = F)
-anova(m1)
-emmeans(m1, pairwise~Block|BIS, adjust='Bonferroni')
-emmeans(m1, pairwise~Block|MAE_Score, adjust='Bonferroni')
-
-visreg(m1, xvar = 'MAE_Score', by='Block',line=list(col='#20A386FF'),
-       gg=T) + theme_bw()+ ggtitle("Interaktion MAE und Block")
-
-visreg(m1, xvar = 'BIS', by='Block',line=list(col='#20A386FF'),
-       gg=T) + theme_bw()+ ggtitle("Interaktion BIS und Block")
-
-
-m1_1<-lmer(Payoff~Block+BAS_Score+BIS+FFFS+MAE_Score
-           +(1|VP), data=Data_reg)
-anova(m1_1)
-
-m2<-lmer(Payoff~Block*BAS_Rew_Int+ 
-           Block*BAS_Rew_Reac+ 
-           Block*BAS_Goal_Drive+
-           Block*BAS_Impulsiv+ (1|VP), data=Data_reg, REML=F)
-anova(m2)
-visreg(m2)
-
-visreg(m2,line=list(col='#20A386FF'),main="Goal-Drive")
-
-m2_1<-lmer(Payoff~Block+BAS_Rew_Int+BAS_Rew_Reac+
-            BAS_Goal_Drive+BAS_Impulsiv + 
-            (1|VP), data=Data_reg)
-anova(m2_1)
-
-m3<-lmer(Payoff~Block*PE+
-           Block*AC+
-           Block*SP+(1|VP), data=Data_reg, REML=F)
-anova(m3)
-
-visreg(m3, xvar = 'SP', by='Block',line=list(col='#20A386FF'),
-       gg=T) + theme_bw()+ ggtitle("Interaktion Social Potency und Block")
-
-m3_1<-lmer(Payoff~Block+PE+AC+SP+
-             (1|VP), data=Data_reg)
-anova(m3_1)
-
-#--------HLM: RT_mean by Personality and Block-------------------------------
-
-m1<-lmer(RT_mean ~ 
-         Block*BAS_Score +
-         Block*BIS + 
-         Block*FFFS +
-         Block*MAE_Score + 
-         (1|VP), data=Data_reg, REML=F)
-anova(m1)
-
-m1_1<-lmer(RT_mean ~ 
-           Block + BAS_Score +
-           BIS + 
-           FFFS +
-           MAE_Score + (1|VP), data=Data_reg)
-anova(m1_1)
-
-m2<-lmer(RT_mean ~ 
-         Block*BAS_Rew_Int + 
-         Block*BAS_Rew_Reac + 
-         Block*BAS_Goal_Drive + 
-         Block*BAS_Impulsiv + (1|VP), data=Data_reg, REML=F)
-anova(m2)
-
-m2_1<-lmer(RT_mean ~ 
-           Block + BAS_Rew_Int + 
-           BAS_Rew_Reac + 
-           BAS_Goal_Drive + 
-           BAS_Impulsiv + (1|VP), data=Data_reg)
-anova(m2_1)
-
-
-m3<-lmer(RT_mean ~ 
-         Block*PE +
-         Block*AC +
-         Block*SP + (1|VP), data=Data_reg, REML=F)
-anova(m3)
-
-m3_1<-lmer(RT_mean ~ 
-           Block  +
-           PE + AC + SP + (1|VP), data=Data_reg)
-anova(m3_1)
-
-#--------HLM with intercept and slopes for IGT-Score and RT----------------
-m1<-lmer(IGT_Score ~ 
-           Block*BAS_Score + 
-           Block*BIS + 
-           Block*FFFS + 
-           Block*MAE_Score
-         + (1+Card|VP), data=Data_reg_all)
-anova(m1)
-
-
-m1_1<-lmer(IGT_Score ~ Block + BAS_Score + BIS + 
-             + FFFS + MAE_Score + (1+Card|VP),
-           data=Data_reg_all)
-anova(m1_1)
-
-
-
-m2<-lmer(IGT_Score ~ 
-           Block*BAS_Rew_Int +
-           Block*BAS_Rew_Reac +
-           Block*BAS_Goal_Drive +
-           Block*BAS_Impulsiv + 
-           (1+Card|VP), data=Data_reg_all)
-anova(m2)
-
-m2_1<-lmer(IGT_Score ~ Block +
-             BAS_Rew_Int +
-             BAS_Rew_Reac +
-             BAS_Goal_Drive +
-             BAS_Impulsiv + (1+Card|VP), data=Data_reg_all)
-anova(m2_1)
-
-
-m3<-lmer(IGT_Score ~   
-           Block*PE + 
-           Block*AC + 
-           Block*SP+
-           (1+Card|VP), data=Data_reg_all)
-anova(m3)
-
-m3_1<-lmer(IGT_Score ~ Block + PE + AC +  (1+Card| VP), 
-           data=Data_reg_all)
-anova(m3_1)
-
-
-
-m1<-lmer(RT_mean ~ 
-           Block*BAS_Score +
-           Block*BIS + 
-           Block*FFFS +
-           Block*MAE_Score + 
-           (1+Card|VP), data=Data_reg_all)
-anova(m1)
-
-m1_1<-lmer(RT_mean ~ 
-             Block + BAS_Score +
-             BIS + 
-             FFFS +
-             MAE_Score + (1+Card|VP), data=Data_reg_all)
-anova(m1_1)
-
-m2<-lmer(RT_mean ~ 
-           Block*BAS_Rew_Int + 
-           Block*BAS_Rew_Reac + 
-           Block*BAS_Goal_Drive + 
-           Block*BAS_Impulsiv + (1|VP), data=Data_reg_all)
-anova(m2)
-
-m2_1<-lmer(RT_mean ~ 
-             Block + BAS_Rew_Int + 
-             BAS_Rew_Reac + 
-             BAS_Goal_Drive + 
-             BAS_Impulsiv + (1+Card|VP), data=Data_reg_all)
-anova(m2_1)
-
-
-m3<-lmer(RT_mean ~ 
-           Block*PE +
-           Block*AC +
-           Block*SP + (1+Card|VP), data=Data_reg_all)
-anova(m3)
-
-m3_1<-lmer(RT_mean ~ 
-             Block  +
-             PE + AC + SP + (1+Card|VP), data=Data_reg_all)
-anova(m3_1)
-
-AIC(m1)
-
-#--------RT after losses-------------------------
-
-#RT mean
-m1<-lmer(RT_mean ~  Cond * Card + Card * Block + Cond * Block+ 
-           (1|VP), data = Data_loss_win, REML=F)
-anova(m1)
-car::qqPlot(resid(m1))
-
-emmeans(m1, pairwise ~ Block | Cond, adjust='Bonferroni')
-emmip(m1, ~ Cond | Block, CIs=T)
-emmip(m1, ~ Card | Block, CIs=T)
-emmip(m1, ~ Card| Cond, CIs=T)
-emmip(m1, ~ Card | Block | Cond, CIs=T)
-
-m1_1<-lmer(RT_mean ~  Cond  + Card +  Block+
-             (1|VP), data = Data_loss_win, REML=F)
-anova(m1_1)
-car::qqPlot(resid(m1_1))
-
-emmeans(m1_1, pairwise ~ Block | Cond, adjust='fdr')
-emmeans(m1_1, pairwise ~ Card | Cond, adjust='fdr')
-emmeans(m1_1, pairwise ~ Card | Block, adjust='fdr')
-emmeans(m1_1, pairwise ~ Card, adjust='fdr')
-emmeans(m1_1, pairwise ~ Block, adjust='fdr')
-emmeans(m1_1, pairwise ~ Cond, adjust='fdr')
-emmip(m1_1, ~ Cond | Block, CIs=T)
-emmip(m1_1, ~ Card | Block, CIs=T)
-emmip(m1_1, ~ Card| Cond, CIs=T)
-emmip(m1_1, ~ Card | Block | Cond, CIs=T)
-
-m1<-lmer(RT_mean ~ Cond*Block +(1|VP), data = Data_loss_win, REML=F)
-anova(m1)
-car::qqPlot(resid(m1))
-
-emmeans(m1, pairwise ~ Block | Cond, adjust = 'fdr')
-emmip(m1, ~ Block | Cond, CIs=T)
-
-
-# HLM separate
-
-Data_RT_loss <- Data_RT_loss %>% 
-  dplyr::group_by(VP, Block, Card, Cond) %>% 
-  dplyr::summarise(RT_mean=mean(RT))
-
-m1_1<-lmer(RT_mean~Block + (1 |VP), data=Data_RT_loss, REML=F)
-anova(m1_1)
-
-emmeans(m1_1, pairwise ~ Block, adjust="fdr")
-emmip(m1_1, ~ Block, CIs=T)
-
-
-Data_RT_win <- Data_RT_win %>% 
-  dplyr::group_by(VP, Block, Card, Cond) %>% 
-  dplyr::summarise(RT_mean=mean(RT))
-
-m2_1<-lmer(RT_mean~Block + (1|VP), data=Data_RT_win, REML=F)
-anova(m2_1)
-
-emmeans(m2_1, pairwise ~ Block, adjust= "fdr")
-emmip(m2_1, ~ Block, CIs=T)
-
-#--------RT Analysis for log transformed Data-----
-
-#Regression
-m1<-lm(RT_log ~ 
-         Block*BAS_Score +
-         Block*BIS + 
-         Block*FFFS +
-         Block*MAE_Score, data=Data_reg)
 summary(m1)
-car::Anova(m1,type=3)
 
-m1_1<-lm(RT_log ~ 
-           Block + BAS_Score +
-           BIS + 
-           FFFS +
-           MAE_Score, data=Data_reg)
-car::Anova(m1_1,type=3)
+sjPlot::tab_model(m1)
+
+sd(Data_reg$MAE_Score_z)
+sd(Data_reg$BIS_z)
+
+emmeans(m1, pairwise~Block|MAE_Score_z, at=list(MAE_Score_z = c(-13, 13)),
+        adjust='Bonferroni')
+emmeans(m1, pairwise~Block|BIS_z, at=list(BIS_z=c(-12, 12)),
+        adjust='Bonferroni')
+emmeans(m1, pairwise~Block, adjust='Bonferroni')
 
 
-m2<-lm(RT_log ~ 
-         Block*BAS_Rew_Int + 
-         Block*BAS_Rew_Reac + 
-         Block*BAS_Goal_Drive + 
-         Block*BAS_Impulsiv, data=Data_reg)
+visreg(m1, xvar = 'MAE_Score_z', by='Block', line=list(col='#2D718EFF'),
+       gg=T) + theme_bw()+ 
+  xlab("Extraversion")+ ylab("IGT-Score")+
+  theme(axis.title.x = element_text(size=18))+
+  theme(axis.title.y = element_text(size=18))+
+  theme(axis.text.x = element_text(size = 15))+
+  theme(axis.text.y = element_text(size = 15))+
+  theme(strip.text = element_text(size = 12, face="bold"))
+
+visreg(m1, xvar = 'BIS_z', by='Block', line=list(col='#2D718EFF'),
+       gg=T) + theme_bw()+ 
+  xlab("BIS")+ ylab("IGT-Score")+
+  theme(axis.title.x = element_text(size=18))+
+  theme(axis.title.y = element_text(size=18))+
+  theme(axis.text.x = element_text(size = 15))+
+  theme(axis.text.y = element_text(size = 15))+
+  theme(strip.text = element_text(size = 12, face="bold"))      
+
+resid(m1)
+car::qqPlot(resid(m1))
+
+
+m2<-lmer(IGT_Score ~ 
+           Block*BAS_Rew_Int_z +
+           Block*BAS_Rew_Reac_z +
+           Block*BAS_Goal_Drive_z +
+           Block*BAS_Impulsiv_z + (1|VP), data=Data_reg, REML=F)
+anova(m2)
 summary(m2)
-car::Anova(m2,type=3)
 
-m2_1<-lm(RT_log ~ 
-           Block + BAS_Rew_Int + 
-           BAS_Rew_Reac + 
-           BAS_Goal_Drive + 
-           BAS_Impulsiv, data=Data_reg)
-car::Anova(m2_1,type=3)
-visreg(m2_1)
+sd(Data_reg$BAS_Goal_Drive_z)
+sd(Data_reg$BAS_Rew_Int_z)
 
-m3<-lm(RT_log ~ 
-         Block*PE +
-         Block*AC +
-         Block*SP, data=Data_reg)
+emmeans(m2, pairwise~Block|BAS_Goal_Drive_z,at=list(BAS_Goal_Drive_z= c(-3,3)), 
+        adjust='Bonferroni')
+emmeans(m2, pairwise~Block|BAS_Rew_Int_z, at=list(BAS_Rew_Int_z = c(-3, 3)),
+        adjust='Bonferroni')
+emmeans(m2, pairwise~Block, adjust='Bonferroni')
+emmeans(m2, pairwise~BAS_Rew_Int_z, adjust='Bonferroni')
+
+emtrends(m2, var='BAS_Goal_Drive_z', ~1, 
+         at=list(BAS_Rew_Int_z=0, BAS_Rew_Reac_z=0, BAS_Impulsiv_z=0), 
+         adjust='Bonferroni')
+emtrends(m2, var='BAS_Rew_Int_z', ~1, 
+         at=list(BAS_Goal_Drive_z=0, BAS_Rew_Reac_z=0, BAS_Impulsiv_z=0), 
+         adjust='Bonferroni')
+
+
+visreg(m2, xvar = 'BAS_Goal_Drive_z', by='Block',line=list(col='#2D718EFF'),
+       gg=T) + theme_bw()+
+  xlab("Zielgerichtete Beharrlichkeit")+ ylab("IGT-Score")+
+  theme(axis.title.x = element_text(size=18))+
+  theme(axis.title.y = element_text(size=18))+
+  theme(axis.text.x = element_text(size = 15))+
+  theme(axis.text.y = element_text(size = 15))+
+  theme(strip.text = element_text(size = 12, face="bold")) 
+
+visreg(m2, xvar = 'BAS_Rew_Int_z', by='Block',line=list(col='#2D718EFF'),
+       gg=T) + theme_bw()+
+  xlab("Interesse an Belohnung")+ ylab("IGT-Score")+
+  theme(axis.title.x = element_text(size=18))+
+  theme(axis.title.y = element_text(size=18))+
+  theme(axis.text.x = element_text(size = 15))+
+  theme(axis.text.y = element_text(size = 15))+
+  theme(strip.text = element_text(size = 12, face="bold")) 
+
+visreg(m2, xvar= 'BAS_Rew_Int_z', line=list(col='#2D718EFF'), 
+       xlab=("Interesse an Belohnung"), ylab=("IGT-Score"),gg=T)+ theme_bw()+
+  theme(axis.title.x = element_text(size=18))+
+  theme(axis.title.y = element_text(size=18))+
+  theme(axis.text.x = element_text(size = 15))+
+  theme(axis.text.y = element_text(size = 15))
+
+visreg(m2, xvar='BAS_Goal_Drive_z', line=list(col='#2D718EFF'),
+       xlab=("Zielgerichtete Beharrlichkeit"), ylab=("IGT-Score"), gg=T)+ theme_bw()+
+  theme(axis.title.x = element_text(size=18))+
+  theme(axis.title.y = element_text(size=18))+
+  theme(axis.text.x = element_text(size = 15))+
+  theme(axis.text.y = element_text(size = 15))
+
+
+resid(m2)
+car::qqPlot(resid(m2))
+
+m3<-lmer(IGT_Score ~   
+           Block*PE_z + 
+           Block*AC_z + 
+           Block*SP_z+
+           (1|VP), data=Data_reg, REML=F)
+anova(m3)
 summary(m3)
-car::Anova(m3, type=3)
 
-m3_1<-lm(RT_log ~ 
-           Block  +
-           PE + AC + SP, data=Data_reg)
-car::Anova(m3_1, type=3)
+sd(Data_reg$SP_z)
 
+emmeans(m3, pairwise~Block|SP_z,at=list(SP_z=c(-7,7)),
+        adjust='Bonferroni')
+emmeans(m3, pairwise~Block, adjust='Bonferroni')
+
+visreg(m3, xvar = 'SP_z', by='Block',line=list(col='#2D718EFF'),
+       gg=T) + theme_bw()+ 
+  xlab("Soziale Stärke")+ ylab("IGT-Score")+
+  theme(axis.title.x = element_text(size=18))+
+  theme(axis.title.y = element_text(size=18))+
+  theme(axis.text.x = element_text(size = 15))+
+  theme(axis.text.y = element_text(size = 15))+
+  theme(strip.text = element_text(size = 12, face="bold")) 
+
+resid(m3)
+car::qqPlot(resid(m3))
+
+#---------------Payofff------------------
+
+m1<-lmer(Payoff~Block*BAS_Score_z+
+           Block*BIS_z+
+           Block*FFFS_z+
+           Block*MAE_Score_z+ (1|VP), data=Data_reg, REML = F)
+anova(m1)
+summary(m1)
+
+sd(Data_reg$MAE_Score_z)
+sd(Data_reg$BIS_z)
+
+emmeans(m1, pairwise~Block|BIS_z,at=list(BIS_z=c(-12,12)),
+        adjust='Bonferroni')
+emmeans(m1, pairwise~Block|MAE_Score_z,at=list(MAE_Score_z=c(-13,13)),
+        adjust='Bonferroni')
+emmeans(m1, pairwise~Block, adjust='Bonferroni')
+
+visreg(m1, xvar = 'MAE_Score_z', by='Block',line=list(col='#20A386FF'),
+       gg=T) + theme_bw()+
+  xlab("Extraversion")+ ylab("Punktestand")+
+  theme(axis.title.x = element_text(size=18))+
+  theme(axis.title.y = element_text(size=18))+
+  theme(axis.text.x = element_text(size = 15))+
+  theme(axis.text.y = element_text(size = 15))+
+  theme(strip.text = element_text(size = 12, face="bold"))
+
+visreg(m1, xvar = 'BIS_z', by='Block',line=list(col='#20A386FF'),
+       gg=T) + theme_bw()+ 
+  xlab("BIS")+ ylab("Punktestand")+
+  theme(axis.title.x = element_text(size=18))+
+  theme(axis.title.y = element_text(size=18))+
+  theme(axis.text.x = element_text(size = 15))+
+  theme(axis.text.y = element_text(size = 15))+
+  theme(strip.text = element_text(size = 12, face="bold"))
+
+resid(m1)
+car::qqPlot(resid(m1))
+
+m2<-lmer(Payoff~Block*BAS_Rew_Int_z+ 
+           Block*BAS_Rew_Reac_z+ 
+           Block*BAS_Goal_Drive_z+
+           Block*BAS_Impulsiv_z+ (1|VP), data=Data_reg, REML=F)
+anova(m2)
+summary(m2)
+
+emmeans(m2, pairwise~Block, adjust='Bonferroni')
+emtrends(m2, var='BAS_Goal_Drive_z', ~1, 
+         at=list(BAS_Rew_Int_z=0, BAS_Rew_Reac_z=0, BAS_Impulsiv_z=0), 
+         adjust='Bonferroni')
+emtrends(m2, var='BAS_Rew_Reac_z', ~1, 
+         at=list(BAS_Goal_Drive_z=0, BAS_Rew_Int_z=0, BAS_Impulsiv_z=0), 
+         adjust='Bonferroni')
+
+visreg(m2, xvar='BAS_Goal_Drive_z', line=list(col='#20A386FF'),
+       xlab=("Zielgerichtete Beharrlichkeit"), ylab=("Punktestand"), gg=T)+ theme_bw()+
+  theme(axis.title.x = element_text(size=18))+
+  theme(axis.title.y = element_text(size=18))+
+  theme(axis.text.x = element_text(size = 15))+
+  theme(axis.text.y = element_text(size = 15))
+
+visreg(m2, xvar='BAS_Rew_Reac_z', line=list(col='#20A386FF'),
+       xlab=("Reaktivität auf Belohnung"), ylab=("Punktestand"), gg=T)+ theme_bw()+
+  theme(axis.title.x = element_text(size=18))+
+  theme(axis.title.y = element_text(size=18))+
+  theme(axis.text.x = element_text(size = 15))+
+  theme(axis.text.y = element_text(size = 15))
+
+resid(m2)
+car::qqPlot(resid(m2))
+
+
+m3<-lmer(Payoff~Block*PE_z+
+           Block*AC_z+
+           Block*SP_z+(1|VP), data=Data_reg, REML=F)
+anova(m3)
+summary(m3)
+
+sd(Data_reg$SP_z)
+
+emmeans(m3, pairwise~Block|SP_z, at=list(Sp_z=c(-7, 7)),
+        adjust='Bonferroni')
+emmeans(m3, pairwise~Block, adjust='Bonferroni')
+
+
+visreg(m3, xvar = 'SP_z', by='Block',line=list(col=''),
+       gg=T) + theme_bw()+ ggtitle("Interaktion Social Potency und Block")
+
+visreg(m3, xvar = 'SP_z', by='Block',line=list(col='#20A386FF'),
+       gg=T) + theme_bw()+ 
+  xlab("Soziale Stärke")+ ylab("Punktestand")+
+  theme(axis.title.x = element_text(size=18))+
+  theme(axis.title.y = element_text(size=18))+
+  theme(axis.text.x = element_text(size = 15))+
+  theme(axis.text.y = element_text(size = 15))+
+  theme(strip.text = element_text(size = 12, face="bold")) 
+
+
+resid(m3)
+car::qqPlot(resid(m3))
+
+#---------------RT_log-----------------
+
+m1<-lmer(RT_log ~ 
+           Block*BAS_Score_z +
+           Block*BIS_z + 
+           Block*FFFS_z +
+           Block*MAE_Score_z + (1|VP), data=Data_reg, REML = F)
+anova(m1)
+summary(m1)
+
+emmeans(m1, pairwise~Block, adjust='Bonferroni')
+emtrends(m1, var='BAS_Score_z', ~1, 
+         at=list(BIS_z=0, FFFS_z=0, MAE_Score_z=0), 
+         adjust='Bonferroni')
+emtrends(m1, var='FFFS_z', ~1, 
+         at=list(BAS_Score_z=0, BIS_z=0, MAE_Score_z=0), 
+         adjust='Bonferroni')
+
+visreg(m1, xvar='Block', line=list(col='#481568FF'),
+       xlab=("Block"), ylab=("Reaktionszeit"), gg=T)+ theme_bw()+
+  theme(axis.title.x = element_text(size=18))+
+  theme(axis.title.y = element_text(size=18))+
+  theme(axis.text.x = element_text(size = 15))+
+  theme(axis.text.y = element_text(size = 15))+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+visreg(m1, xvar='BAS_Score_z', line=list(col='#481568FF'),
+       xlab=("BAS"), ylab=("Reaktionszeit"), gg=T)+ theme_bw()+
+  theme(axis.title.x = element_text(size=18))+
+  theme(axis.title.y = element_text(size=18))+
+  theme(axis.text.x = element_text(size = 15))+
+  theme(axis.text.y = element_text(size = 15))
+
+visreg(m1, xvar='FFFS_z', line=list(col='#481568FF'),
+       xlab=("FFFS"), ylab=("Reaktionszeit"), gg=T)+ theme_bw()+
+  theme(axis.title.x = element_text(size=18))+
+  theme(axis.title.y = element_text(size=18))+
+  theme(axis.text.x = element_text(size = 15))+
+  theme(axis.text.y = element_text(size = 15))
+
+
+resid(m1)
+car::qqPlot(resid(m1))
+
+
+m2<-lmer(RT_log ~ 
+           Block*BAS_Rew_Int_z + 
+           Block*BAS_Rew_Reac_z + 
+           Block*BAS_Goal_Drive_z + 
+           Block*BAS_Impulsiv_z + (1|VP), data=Data_reg, REML = F)
+anova(m2)
+summary(m2)
+
+sd(Data_reg$BAS_Rew_Int_z)
+
+emmeans(m2, pairwise~Block|BAS_Rew_Int_z, at=list(BAS_Rew_Int_z=c(-3,3)),
+        adjust='Bonferroni')
+emmeans(m2, pairwise~Block, adjust='Bonferroni')
+
+visreg(m2, xvar = 'BAS_Rew_Int_z', by='Block',line=list(col='#481568FF'),
+       gg=T) + theme_bw()+ 
+  xlab("Interesse an Belohnung")+ ylab("Reaktionszeit")+
+  theme(axis.title.x = element_text(size=18))+
+  theme(axis.title.y = element_text(size=18))+
+  theme(axis.text.x = element_text(size = 15))+
+  theme(axis.text.y = element_text(size = 15))+
+  theme(strip.text = element_text(size = 12, face="bold"))
+
+resid(m2)
+car::qqPlot(resid(m2))
+
+
+m3<-lmer(RT_log ~ 
+           Block*PE_z +
+           Block*AC_z +
+           Block*SP_z + (1|VP), data=Data_reg, REML = F)
+anova(m3)
+summary(m3)
+
+emmeans(m3, pairwise~Block, adjust='Bonferroni')
+
+resid(m3)
+car::qqPlot(resid(m3))
 
 
 m4<-lmer(RT_log~Block + (1|VP), data = Data_reg, REML = F)
-summary(m4)
 anova(m4)
+summary(m4)
+
 emmeans(m4, pairwise ~ Block, adjust='Bonferroni')
 
-visreg(m4, xvar = 'RT_log', by='Block',line=list(col='#481568FF'),
-       gg=T) + theme_bw()+ ggtitle("Reaktionszeit")+ theme(axis.title.x=element_blank(),
-      axis.text.x=element_blank(),
-      axis.ticks.x=element_blank())
+resid(m4)
+car::qqPlot(resid(m4))
 
-#HLM with Intercept
-
-m1<-lmer(RT_log ~ 
-           Block*BAS_Score +
-           Block*BIS + 
-           Block*FFFS +
-           Block*MAE_Score + (1|VP), data=Data_reg, REML = F)
-anova(m1)
-
-visreg(m1)
-visreg(m1,line=list(col='#481568FF'),main="Block")
-
-m1_1<-lmer(RT_log ~ 
-             Block + BAS_Score +
-             BIS + 
-             FFFS +
-             MAE_Score + (1|VP), data=Data_reg, REML = F)
-anova(m1_1)
-
-m2<-lmer(RT_log ~ 
-           Block*BAS_Rew_Int + 
-           Block*BAS_Rew_Reac + 
-           Block*BAS_Goal_Drive + 
-           Block*BAS_Impulsiv + (1|VP), data=Data_reg, REML = F)
-anova(m2)
-
-visreg(m2, xvar = 'BAS_Rew_Int', by='Block',line=list(col='#481568FF'),
-       gg=T) + theme_bw()+ ggtitle("Interaktion Reward Interest und Block")
-
-m2_1<-lmer(RT_log ~ 
-             Block + BAS_Rew_Int + 
-             BAS_Rew_Reac + 
-             BAS_Goal_Drive + 
-             BAS_Impulsiv + (1|VP), data=Data_reg, REML = F)
-anova(m2_1)
-
-
-m3<-lmer(RT_log ~ 
-           Block*PE +
-           Block*AC +
-           Block*SP + (1|VP), data=Data_reg, REML = F)
-anova(m3)
-
-
-m3_1<-lmer(RT_log ~ 
-             Block  +
-             PE + AC + SP + (1|VP), data=Data_reg, REML=F)
-anova(m3_1)
-
-## HLM with Intercept and Slopes
-
-m1<-lmer(RT_log ~ 
-           Block*BAS_Score +
-           Block*BIS + 
-           Block*FFFS +
-           Block*MAE_Score + 
-           (1+Card|VP), data=Data_reg_all)
-anova(m1)
-
-m1_1<-lmer(RT_log ~ 
-             Block + BAS_Score +
-             BIS + 
-             FFFS +
-             MAE_Score + (1+Card|VP), data=Data_reg_all)
-anova(m1_1)
-
-m2<-lmer(RT_log ~ 
-           Block*BAS_Rew_Int + 
-           Block*BAS_Rew_Reac + 
-           Block*BAS_Goal_Drive + 
-           Block*BAS_Impulsiv + (1|VP), data=Data_reg_all)
-anova(m2)
-
-m2_1<-lmer(RT_log ~ 
-             Block + BAS_Rew_Int + 
-             BAS_Rew_Reac + 
-             BAS_Goal_Drive + 
-             BAS_Impulsiv + (1+Card|VP), data=Data_reg_all)
-anova(m2_1)
-
-
-m3<-lmer(RT_log ~ 
-           Block*PE +
-           Block*AC +
-           Block*SP + (1+Card|VP), data=Data_reg_all)
-anova(m3)
-
-m3_1<-lmer(RT_log ~ 
-             Block  +
-             PE + AC + SP + (1+Card|VP), data=Data_reg_all)
-anova(m3_1)
-
-## RT after losses
+# RT after losses
 
 Data_loss_win$RT_log = log(Data_loss_win$RT_mean)
 
-
-m1<-lmer(RT_log ~ Cond*Block 
-         +(1|VP), data = Data_loss_win, REML=F)
-anova(m1)
-
-emmeans(m1, pairwise ~ Block | Cond, adjust = 'fdr')
-
 m1<-lmer(RT_log ~  Cond * Card + Card * Block + Cond * Block+ 
            (1|VP), data = Data_loss_win, REML=F)
+summary(m1)
 anova(m1)
+
+resid(m1)
+car::qqPlot(resid(m1))
 
 emmeans(m1, pairwise ~ Block | Cond, adjust='Bonferroni')
 emmeans(m1, pairwise ~ Cond | Block, adjust='Bonferroni')
-emmip(m1,~Cond|Block, CIs=T, engine ="ggplot",line=list(col='#481568FF')) + theme_bw() 
-#ändert Farbe nicht, aber Code läuft
-emmip(m1, ~Card|Cond|Block, CIs=T)+ theme_bw()
-summary(m1)
 
-#--------Poweranalysis-------------------
+emmip(m1, Cond ~ Block, CIs=T,engine ="ggplot") + theme_bw() + 
+  theme(axis.text.x = element_text(size = 13)) + 
+  theme(axis.title.x = element_text(size=15))+
+  theme(axis.title.y = element_text(size=15))+
+  theme(axis.text.y = element_text(size=13))+
+  scale_color_manual(values = viridis(2, option = 'D', end=.6, direction = -1),
+                     (name="Bedingung"), labels=c("nach Verlust", "nach Gewinn"))+
+  theme(legend.text = element_text(size=10))+
+  theme(legend.title = element_text(size = 10, face = "bold" ))+
+  xlab("Block") +
+  ylab("Reaktionszeit") 
 
-#IGT Score by Block in Data_reg
-pwr.f2.test(u = 2, v = NULL , f2 = 0.02 , sig.level = 0.05, power = .8)
-
-etasq(m1, anova=TRUE, partial =T) 
-
-#IGT Score by Personality and Block in Data_reg
-pwr.f2.test(u = 2, v =75 , f2 = 0.018, sig.level = 0.05)
-
-
-#--------Visualisierung-------------------------------
-stargazer(m1, out="m1.htm")
-
-stargazer(m2, m3, type="html", intercept.bottom = FALSE, single.row = T,
-          dep.var.labels = c("IGT_Score"), 
-          covariate.labels = c("A"), out= "m2u3.htm")
-
-visreg(m5, "IGT_Score", by= "Block")
-
-visreg(m3, "IGT_Score", by= "MAE_Score", main= "MAE", ylab="IGT-Score", xlab="Extraversion")
-
-visreg(m3, "IGT_Score",by="MAE_Score", cond=list("Block"="1"), main="Block1")
-
-visreg(m3)
-visreg(m2)
-visreg(m1)
+emmip(m1, Cond~Block|Card, CIs=T)+ theme_bw()+
+  theme(axis.text.x = element_text(size = 13)) + 
+  theme(axis.title.x = element_text(size=15))+
+  theme(axis.title.y = element_text(size=15))+
+  theme(axis.text.y = element_text(size=13))+
+  scale_color_manual(values = viridis(2, option = 'D', end=.6, direction = -1),
+                     (name="Bedingung"), labels=c("nach Verlust", "nach Gewinn"))+
+  theme(legend.text = element_text(size=10))+
+  theme(legend.title = element_text(size = 10, face = "bold" ))+
+  theme(strip.text = element_text(size = 10, face = "bold"))
+xlab("Block") +
+  ylab("Reaktionszeit")
 
 
-#--------Regression tables------------------
-
-#IGT-Score
-apa.reg.table(m1_1, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table11.doc", table.number = 1)
-apa.reg.table(m2_1, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table12.doc", table.number = 2)
-apa.reg.table(m3_1, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table13.doc", table.number = 3)
-apa.aov.table(m1_1, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table11a.doc", table.number = 1)
-apa.aov.table(m2_1, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table12a.doc", table.number = 2)
-apa.aov.table(m3_1, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table13a.doc", table.number = 3)
-
-#Payoff
-apa.reg.table(m1, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table21.doc", table.number = 1)
-apa.reg.table(m2_1, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table22.doc", table.number = 2)
-apa.reg.table(m3, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table23.doc", table.number = 3)
-apa.aov.table(m1, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table21a.doc", table.number = 1)
-apa.aov.table(m2_1, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table22a.doc", table.number = 2)
-apa.aov.table(m3, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table23a.doc", table.number = 3)
-
-#RT_mean
-apa.reg.table(m1_1, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table31.doc", table.number = 1)
-apa.reg.table(m2_1, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table32.doc", table.number = 2)
-apa.reg.table(m3_1, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table33.doc", table.number = 3)
-apa.aov.table(m1_1, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table31a.doc", table.number = 1)
-apa.aov.table(m2_1, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table32a.doc", table.number = 2)
-apa.aov.table(m3_1, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table33a.doc", table.number = 3)
-
-#--------Partial Correlation----------------
-
-cor(Data_reg$IGT_Score, Data_reg$BAS_Score)
-cor.test(Data_reg$IGT_Score, Data_reg$BAS_Score)
-pcor.test(Data_reg$IGT_Score,Data_reg$BAS_Score,Data_reg[c("RT_mean")])
-          
-?apaTables
+emmip(m1, Cond~Card|Block, CIs=T)+ theme_bw()
+emmip(m1, Card~Cond|Block, CIs=T)+ theme_bw()
+emmip(m1, Block~Cond|Card, CIs=T)+ theme_bw()
+emmip(m1, Card~Block|Cond, CIs=T)+ theme_bw()
+emmip(m1, Block~Card|Cond, CIs=T)+ theme_bw()
 
 
-
-
-
-
-###OLD CODE-----------------------------------------------------------------
-#--------Anova RT by Block-----------------------------------------------
-
-#---- M1: RT by Block
-Data_full$Block <- as.factor(Data_full$Block)
-m1<-lm(RT~Block,data=Data_full)                            
-summary(m1)
-anova(m1)
-
-# Post-hoc Test
-mult1<- glht(m1,mcp(Block="Tukey"))             
-summary(mult1)
-
-summarise(group_by(Data_card,Block),mean(RT))   
-visreg(m1)
-#--------Anova Frequency Cards by Block and Card--------
-
-#M3: N by Block and Card
-m3<-lm(N~Block*Card, data=Data_sum)
-anova(m3)
-plot(m3)
-
-# plot effects for M3
-m3f<-allEffects((m3))
-plot(m3f)
-
-#--------Regression Analysis -----------------
-
-#Total score by personality/RT in large data frame
-#merge into large data set
-Data_full2 <- merge (Data_score_all, Data_full, by.x = 'VP', by.y = 'VP')
-
-m1<-lm(IGT_Score_all~Block*BAS_Score*BIS*MAE_Score, data=Data_full2)
-summary(m4)
-
-m2<-lm(IGT_Score_all~RT, data=Data_full2)
-summary(m5)
-
-m3<-lm(IGT_Score_all~BAS_Score, data=Data_full2)
-summary(m6)
-
-# Total Score in small data frame
-m1<-lm(IGT_Score~Block,data=Data_score)                            
-summary(m1)
-anova(m1)
-
-m2<-lm(IGT_Score_all~MAE_Score, data=Data_pers_score_all)
-summary(m2)
-
-m3<-lm(IGT_Score_all~BAS_Score, data=Data_pers_score_all)
-summary(m3)
-
-
-#Block 3 Score in small data frame
-m1<-lm(IGT_Score~BIS,data=Data_pers_score3)                            
-summary(m1)
-
-m2<-lm(IGT_Score~MAE_Score, data=Data_pers_score3)
-summary(m2)
-
-m3<-lm(IGT_Score~BAS_Score, data=Data_pers_score3)
-summary(m3)
-
-#Split by Blocks in final data frame
-Data_reg1<-dplyr::filter(Data_reg, Block==1)
-Data_reg2<-dplyr::filter(Data_reg, Block==2)
-Data_reg3<-dplyr::filter(Data_reg, Block==3)
-
-#Score by Personality in Block1
-m1<-lm(IGT_Score~BAS_Score*BIS*FFFS*MAE_Score, data=Data_reg1)
-summary(m1)
-anova(m1)
-
-m2<-lm(IGT_Score~BAS_Rew_Int*BAS_Rew_Reac*BAS_Goal_Drive*BAS_Impulsiv, data=Data_reg1)
-summary(m2)
-anova(m2)
-
-m3<-lm(IGT_Score~MAE_Score*PE*AC*SP, data=Data_reg1)
-summary(m3)
-anova(m3)
-
-#Score by Personality in Block2
-m1<-lm(IGT_Score~BAS_Score*BIS*FFFS*MAE_Score, data=Data_reg2)
-summary(m1)
-anova(m1)
-
-m2<-lm(IGT_Score~BAS_Rew_Int*BAS_Rew_Reac*BAS_Goal_Drive*BAS_Impulsiv, data=Data_reg2)
-summary(m2)
-anova(m2)
-
-m3<-lm(IGT_Score~MAE_Score*PE*AC*SP, data=Data_reg2)
-summary(m3)
-anova(m3)
-
-#Score by Personality in Block3
-m1<-lm(IGT_Score~BAS_Score*BIS*FFFS*MAE_Score, data=Data_reg3)
-summary(m1)
-anova(m1)
-
-m2<-lm(IGT_Score~BAS_Rew_Int*BAS_Rew_Reac*BAS_Goal_Drive*BAS_Impulsiv, data=Data_reg3)
-summary(m2)
-anova(m2)
-
-m3<-lm(IGT_Score~MAE_Score*PE*AC*SP, data=Data_reg3)
-summary(m3)
-anova(m3)

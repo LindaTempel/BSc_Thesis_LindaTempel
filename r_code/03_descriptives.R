@@ -12,40 +12,69 @@ pkgs <- c('dplyr', 'plyr', 'ggplot2', 'viridis', 'rcompanion')
 getPacks(pkgs)
 rm(pkgs)
 
-##-----------Part A: Behavioral data-------------------------
+#--------Means, standard deviation for personality scores------------------------
+mean(Data_pers_score$MAE_Score)
+sd(Data_pers_score$MAE_Score)
 
-# means, standard deviation
-mean(Data_card$RT)
-sd(Data_card$RT)
-mean(Data_card$Payoff)
-sd(Data_card$Payoff)
+mean (Data_pers_score$FFFS)
+sd (Data_pers_score$FFFS)
 
-# Payoff per Block
+mean(Data_pers_score$BIS)
+sd(Data_pers_score$BIS)
 
-Graph2 <- dplyr::select(Data_card, VP,Block,Payoff)
-Graph2 <- Data_card %>% 
-  dplyr::group_by(Block) %>% 
-  dplyr::summarise(M=mean(Payoff), SD=sd(Payoff), SE=sd(Payoff)/sqrt(sum(!is.na(Payoff))))
- 
-Graph2$Block<-as.factor(Graph2$Block)
+mean(Data_pers_score$BAS_Score)
+sd(Data_pers_score$BAS_Score)
 
-ggplot(Graph2, aes(x=Block, y=M, fill=Block)) + 
+mean(Data_pers_score$BAS_Rew_Int)
+sd(Data_pers_score$BAS_Rew_Int)
+
+mean(Data_pers_score$BAS_Rew_Reac)
+sd(Data_pers_score$BAS_Rew_Reac)
+
+mean(Data_pers_score$BAS_Goal_Drive)
+sd(Data_pers_score$BAS_Goal_Drive)
+
+mean(Data_pers_score$BAS_Impulsiv)
+sd(Data_pers_score$BAS_Impulsiv)
+
+mean(Data_pers_score$PE)
+sd(Data_pers_score$PE)
+
+mean(Data_pers_score$AC)
+sd(Data_pers_score$AC)
+
+mean(Data_pers_score$SP)
+sd(Data_pers_score$SP)
+
+#--------Reliability personality scales----------------------
+#--------Bar plot frequency of cards -----------------
+
+Graph <- Data_sum %>% 
+  dplyr::group_by(Block, Card) %>% 
+  dplyr::summarise(M=mean(N), SD=sd(N), SE=sd(N)/sqrt(sum(!is.na(N))))%>%
+  dplyr::filter(!Card==0)
+
+ggplot(Graph, aes(x=Block, y=M,  fill=Card)) + 
   geom_bar(position=position_dodge(), stat="identity",
-           colour=NA, width=.5) +
+           colour=NA) +
   geom_errorbar(aes(ymin=M-SE, ymax=M+SE),
-                width=.05,
+                width=.2,
                 size=.8,
                 position=position_dodge(.9),
                 colour="gray20")+
   xlab("Block") +
-  ylab("Payoff(means)") +
-  scale_fill_viridis(option="viridis", discrete = T) +
-  ggtitle("Payoff") +
-  scale_y_continuous(breaks=seq(0,1000,100)) +
+  ylab("Gewählte Stapel (Mittelwert)") +
+  scale_fill_viridis(option="viridis", discrete = T, name=("Karte")) +
+  scale_y_continuous(breaks=0:20*4) +
   theme_bw()+
-  theme(legend.position="none")
+  theme(axis.title.x = element_text(size=18))+
+  theme(axis.title.y = element_text(size=18))+
+  theme(axis.text.x = element_text(size=18))+
+  theme(axis.text.y = element_text(size=15))+
+  theme(legend.title = element_text(size=15, face = "bold"))+
+  theme(legend.text = element_text(size=12))
 
-#IGT-Score per Block
+#--------Bar plot IGT-Score per Block-----------------
 
 Graph3 <- dplyr::select(Data_score, VP,Block,IGT_Score)
 Graph3 <- Data_score %>% 
@@ -63,14 +92,45 @@ ggplot(Graph3, aes(x=Block, y=M, fill=Block)) +
                 position=position_dodge(.9),
                 colour="gray20")+
   xlab("Block") +
-  ylab("IGT-Score (means)") +
+  ylab("IGT-Score (Mittelwert)") +
   scale_fill_viridis(option="viridis", discrete = T) +
-  ggtitle("IGT-Score") +
   scale_y_continuous(breaks=seq(-10,10,5)) +
   theme_bw()+
-  theme(legend.position="none")
+  theme(legend.position="none")+
+  theme(axis.title.x = element_text(size=18))+
+  theme(axis.title.y = element_text(size=18))+
+  theme(axis.text.x = element_text(size=18))+
+  theme(axis.text.y = element_text(size=18))
 
-# RT_mean by Block
+#--------Bar plot Payoff per Block------------------------
+
+Graph2 <- dplyr::select(Data_card, VP,Block,Payoff)
+Graph2 <- Data_card %>% 
+  dplyr::group_by(Block) %>% 
+  dplyr::summarise(M=mean(Payoff), SD=sd(Payoff), SE=sd(Payoff)/sqrt(sum(!is.na(Payoff))))
+
+Graph2$Block<-as.factor(Graph2$Block)
+
+ggplot(Graph2, aes(x=Block, y=M, fill=Block)) + 
+  geom_bar(position=position_dodge(), stat="identity",
+           colour=NA, width=.5) +
+  geom_errorbar(aes(ymin=M-SE, ymax=M+SE),
+                width=.05,
+                size=.8,
+                position=position_dodge(.9),
+                colour="gray20")+
+  xlab("Block") +
+  ylab("Punktestand (Mittelwert)") +
+  scale_fill_viridis(option="viridis", discrete = T) +
+  scale_y_continuous(breaks=seq(0,1000,100)) +
+  theme_bw()+
+  theme(legend.position="none")+
+  theme(axis.title.x = element_text(size=18))+
+  theme(axis.title.y = element_text(size=18))+
+  theme(axis.text.x = element_text(size=18))+
+  theme(axis.text.y = element_text(size=15))
+
+#--------Bar plot RT_mean by Block----------------------
 
 Graph4 <- dplyr::select(Data_card, VP,Block,RT)
 Graph4 <- Data_card %>% 
@@ -88,96 +148,15 @@ ggplot(Graph4, aes(x=Block, y=M, fill=Block)) +
                 position=position_dodge(.9),
                 colour="gray20")+
   xlab("Block") +
-  ylab("RT (means)") +
+  ylab("RT (Mittelwert)") +
   scale_fill_viridis(option="viridis", discrete = T) +
-  ggtitle("Reaktionszeit") +
   scale_y_continuous(breaks=seq(0,800,100)) +
   theme_bw()+
-  theme(legend.position="none")
-
-
-# Check normal distribution 
-plotNormalHistogram(Data_reg$RT_log)
-
-plotNormalHistogram(Data_reg$RT_mean)
-
-plotNormalHistogram(Data_reg$IGT_Score)
-
-plotNormalHistogram(Data_reg$Payoff)
-
-plotNormalHistogram(Data_full$RT)
-
-   
-
-
-
-## ----------Part B: Personality data-------------------------
-
-# means, standard deviation
-mean(Data_pers_score$MAE_Score)
-sd(Data_pers_score$MAE_Score)
-
-mean (Data_pers_score$FFFS)
-sd (Data_pers_score$FFFS)
-
-mean(Data_pers_score$BIS)
-sd(Data_pers_score$BIS)
-
-mean(Data_pers_score$BAS_Score)
-sd(Data_pers_score$BAS_Score)
-
-#graphs
-
-hist(Data_pers_score$MAE_Score)
-hist(Data_pers_score$FFFS)
-hist(Data_pers_score$BIS)
-hist(Data_pers_score$BAS_Score)
-hist(Data_pers_score$BAS_Impulsiv)
-
-#sample characteristics
-
-range(Data_pers_full$SD02_01)
-mean(Data_pers_full$SD02_01)
-sd(Data_pers_full$SD02_01)
-
-
-count(Data_pers_full, 'SD01')
-
-Data_pers_full$SD09_01 <- plyr::revalue(Data_pers_full$SD09_01, c('Psychologie B.Sc.' = 'Psychologie',
-                                                                  'Psychologiestudentin ' = 'Psychologie',
-                                                                  'Psychologie, Bsc.' = 'Psychologie',
-                                                                  'Bachelor Psychologie' ='Psychologie', 
-                                                                  'Master Chemie' = 'Chemie', 
-                                                                  'MSc Chemie'= 'Chemie', 
-                                                                  'B.A. Sozialwissenschaften' = 'Sozialwissenschaften'))
-count(Data_pers_full, 'SD09_01')
-
-
-mean(Data_pers_full$SD08_01)
-
-##Percentages
-
-SD01_per <- Data_pers_full %>% 
-  count('SD01') %>%            
-  mutate(per = freq/sum(freq)*100)
-
-SD09_01_per <- Data_pers_full %>% 
-  count('SD09_01') %>%            
-  mutate(per = freq/sum(freq)*100)
-
-##Gambling experience
-Data_gambling<-dplyr::select(Data_pers_full, VP, GA21_01:GA21_09)
-
-Data_gambling<- dplyr::mutate(Data_gambling,Score_total=(GA21_01 + GA21_02 + GA21_03 + 
-                                                           GA21_04 + GA21_05 + GA21_06 +
-                                                           GA21_07 + GA21_08 + GA21_09))
-
-Data_gambling$Score_total<-as.factor(Data_gambling$Score_total)
-Data_gambling$Score_final <- plyr::revalue(Data_gambling$Score_total, c('9' = '0', '10'='1','11'='2', '12'='3', '12'='4'))
-
-count(Data_gambling, 'Score_final')
-
-#1= Nein, 2=Ja. 
+  theme(legend.position="none")+
+  theme(axis.title.x = element_text(size=18))+
+  theme(axis.title.y = element_text(size=18))+
+  theme(axis.text.x = element_text(size=18))+
+  theme(axis.text.y = element_text(size=15))
 
 
 
