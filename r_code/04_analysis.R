@@ -2,7 +2,7 @@
 #                                    June 2018 
 
 # Load helper functions
-setwd("D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten")
+setwd("")
 source('./r_functions/getPacks.R') # <- path to getPacks function
 source('./r_functions/flattenCorrMatrix.R')
 # Load necessary packages
@@ -12,6 +12,120 @@ pkgs <- c('dplyr', 'plyr', 'Hmisc', 'multcomp', 'effects', 'phia', 'emmeans', 'l
           'apaTables', 'scales')
 getPacks(pkgs)
 rm(pkgs)
+
+
+
+#--------Merge behavioral and personality data---------
+Data_full<- merge (Data_card, Data_pers_full, by.x='VP', by.y = 'VP')
+
+Data_full$Block<-as.factor(Data_full$Block)
+
+
+#--------Data frame for frequency of cards---------
+
+Data_sum <- Data_full %>% 
+  dplyr::group_by(VP, Block, Card) %>% 
+  dplyr::summarise(N=sum(!is.na(Card))) %>% 
+  dplyr::filter(!Card==0)
+
+
+#--------Calculating IGT-Score, RT mean and Payoff-------------------------
+
+#turning long into wide format
+Data_score <- dcast(Data_sum, VP + Block ~ Card, value.var="N")
+
+#Switching columns
+Data_score <- Data_score[c("VP", "Block", "A", "B", "C", "D")]
+
+#-------Calculating Score for each Block
+Data_score[is.na(Data_score)] <- 0
+Data_score<- dplyr::mutate(Data_score,IGT_Score=((C+D)-(A+B)))
+
+#--------Select payoff at end of Block only
+Data_behav3<-Data_behav %>% dplyr::select(VP, Block,Trial, Payoff)
+Data_behav3<-dplyr::filter(Data_behav3, Trial==100)
+Data_behav3<-Data_behav3 %>% dplyr::select(VP, Block,Payoff)
+
+#merge with personality
+Data_reg <- merge (Data_score, Data_behav3)
+Data_reg <- merge (Data_reg, Data_pers_score, by.x = 'VP', by.y = 'VP')
+
+#--------Calculating mean of RT for each Block
+Data_RT <- Data_card %>% 
+  dplyr::group_by(VP, Block) %>% 
+  dplyr::summarise(RT_mean=mean(RT))
+
+#merge into final data frame for regression
+Data_reg <- merge (Data_reg, Data_RT)
+
+#Log Transformation for RT
+Data_reg$RT_log = log(Data_reg$RT_mean)
+
+
+##-------Calculating total score
+Data_score_all <- Data_score %>% 
+  dplyr::group_by(VP) %>% 
+  dplyr::summarise(IGT_Score_all=sum(IGT_Score))
+
+#merge with personality scores
+Data_pers_score_all <- merge (Data_score_all, Data_pers_score)  
+
+#--------Alternative: bigger data set for Analysis with slopes------
+
+Data_RT_all <- Data_card %>% 
+  dplyr::group_by(VP, Block, Card) %>% 
+  dplyr::summarise(RT_mean=mean(RT)) %>%
+  dplyr::filter(!Card==0)
+
+perso <- dplyr::select(Data_pers_score, BAS_Score, MAE_Score, BIS, FFFS, 
+                       PE, AC, SP, BAS_Rew_Int, 
+                       BAS_Rew_Reac, BAS_Goal_Drive, BAS_Impulsiv, VP)
+Data_reg_all <- merge(Data_sum, perso, 'VP')
+Data_reg_all <-merge(Data_reg_all, Data_RT_all)
+Data_reg_all <-merge(Data_reg_all, Data_score)
+Data_reg_all <- merge (Data_reg_all, Data_behav3)
+Data_reg_all$VP <-as.factor(Data_reg_all$VP)  
+
+Data_reg_all$RT_log = log(Data_reg_all$RT_mean)
+
+
+#--------Center around zero: Personality variables----
+
+Data_reg <- within(Data_reg, {
+  MAE_Score_z <- MAE_Score - mean(MAE_Score, na.rm=T)
+  BAS_Score_z <- BAS_Score - mean(BAS_Score, na.rm=T )
+  BIS_z <- BIS - mean(BIS, na.rm=T)
+  FFFS_z <- FFFS - mean(FFFS, na.rm=T)
+  BAS_Rew_Int_z <- BAS_Rew_Int - mean(BAS_Rew_Int, na.rm=T)
+  BAS_Rew_Reac_z <- BAS_Rew_Reac - mean(BAS_Rew_Reac, na.rm=T)
+  BAS_Goal_Drive_z <- BAS_Goal_Drive - mean(BAS_Goal_Drive, na.rm=T)
+  BAS_Impulsiv_z <- BAS_Impulsiv - mean(BAS_Impulsiv, na.rm=T)
+  PE_z <- PE - mean(PE, na.rm=T)
+  AC_z <- AC - mean(AC, na.rm=T)
+  SP_z <- SP - mean(SP, na.rm=T)
+})
+
+#--------Data frame for RT after losses/wins---------
+
+Data_RT_split<-dplyr::select(Data_full, VP, Block, RT, Card, net_payoff)
+
+Data_RT_split<-dplyr::filter(Data_RT_split, Card %in% c('A', 'B', 'C', 'D'))
+Data_RT_split$Card <- factor(Data_RT_split$Card)
+
+Data_RT_loss <- dplyr::filter(Data_RT_split, lag(net_payoff, 1)<0)
+Data_RT_win <- dplyr::filter(Data_RT_split, lag(net_payoff,1)>0)
+
+Data_RT_loss$Cond<-c("loss")
+Data_RT_win$Cond<-c("win")
+
+Data_loss_win<-rbind(Data_RT_loss, Data_RT_win)
+
+Data_loss_win$Cond <- as.factor(Data_loss_win$Cond)
+Data_loss_win$VP <- as.factor(Data_loss_win$VP)
+
+Data_loss_win <- Data_loss_win %>% 
+  dplyr::group_by(VP, Block, Card, Cond) %>% 
+  dplyr::summarise(RT_mean=mean(RT))
 
 #Personality Data
 
@@ -55,9 +169,6 @@ corrplot(matrix2$r, method=c("number"), type="full", order="original", tl.col="b
 
 
 
-
-#Behavioral Data
-
 #Behavioral Data
 
 #---------------Chosen Decks----------------
@@ -65,10 +176,9 @@ corrplot(matrix2$r, method=c("number"), type="full", order="original", tl.col="b
 mod_card <- lmer(N ~ Card*Block + (1+Card|VP), data=Data_reg_all, REML = F)
 summary(mod_card)
 anova(mod_card)
-AIC(mod_card)
 emmeans(mod_card, pairwise ~ Card |Block, adjust='Bonferroni')
 
-visreg(mod_card,'Card', by='Block')
+AIC(mod_card)
 
 resid(mod_card)
 car::qqPlot(resid(mod_card))
@@ -209,6 +319,8 @@ car::qqPlot(resid(m3))
 
 #---------------Payofff------------------
 
+cor.test(Data_reg$IGT_Score, Data_reg$Payoff)
+
 m1<-lmer(Payoff~Block*BAS_Score_z+
            Block*BIS_z+
            Block*FFFS_z+
@@ -290,10 +402,6 @@ sd(Data_reg$SP_z)
 emmeans(m3, pairwise~Block|SP_z, at=list(Sp_z=c(-7, 7)),
         adjust='Bonferroni')
 emmeans(m3, pairwise~Block, adjust='Bonferroni')
-
-
-visreg(m3, xvar = 'SP_z', by='Block',line=list(col=''),
-       gg=T) + theme_bw()+ ggtitle("Interaktion Social Potency und Block")
 
 visreg(m3, xvar = 'SP_z', by='Block',line=list(col='#20A386FF'),
        gg=T) + theme_bw()+ 
@@ -450,3 +558,8 @@ emmip(m1, Card~Block|Cond, CIs=T)+ theme_bw()
 emmip(m1, Block~Card|Cond, CIs=T)+ theme_bw()
 
 
+#Tables (for basic layout, needs to be filled in by hand)
+
+apa.reg.table(m1_1, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table11.doc", table.number = 1)
+
+apa.aov.table(m1_1, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table11a.doc", table.number = 1)

@@ -4,7 +4,7 @@
 
 
 # Load helper functions
-setwd("D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten")
+setwd("")
 source('./r_functions/getPacks.R') # <- path to getPacks function
 
 # Load necessary packages
@@ -15,7 +15,7 @@ rm(pkgs)
 # ----- 1) Read in the data -------------------------------------------
 
 # # Set path before start
-path <- c("D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\rawdata") # <- location of files
+path <- c("") # <- location of files
 
 paths <- dir(path = path, full.names = T, pattern = "\\.txt$")
 names(paths) <- basename(paths)

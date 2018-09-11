@@ -4,7 +4,7 @@
 
 
 # Load helper functions
-setwd("D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten")
+setwd("")
 source('./r_functions/getPacks.R') # <- path to getPacks function
 
 # Load necessary packages
@@ -159,5 +159,16 @@ ggplot(Graph4, aes(x=Block, y=M, fill=Block)) +
   theme(axis.text.y = element_text(size=15))
 
 
+# Check normal distribution 
+plotNormalHistogram(Data_reg$RT_log)
 
+plotNormalHistogram(Data_reg$RT_mean)
+
+plotNormalHistogram(Data_reg$IGT_Score)
+
+plotNormalHistogram(Data_reg$Payoff)
+
+plotNormalHistogram(Data_full$RT)
+
+plotNormalHistogram(Data_reg_all$N)
 
