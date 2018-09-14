@@ -12,7 +12,8 @@ pkgs <- c('dplyr', 'plyr', 'ggplot2', 'viridis', 'rcompanion')
 getPacks(pkgs)
 rm(pkgs)
 
-#--------Means, standard deviation for personality scores------------------------
+#--------1) Means, standard deviation for personality scores------------------------
+
 mean(Data_pers_score$MAE_Score)
 sd(Data_pers_score$MAE_Score)
 
@@ -46,8 +47,13 @@ sd(Data_pers_score$AC)
 mean(Data_pers_score$SP)
 sd(Data_pers_score$SP)
 
-#--------Reliability personality scales----------------------
-#--------Bar plot frequency of cards -----------------
+#--------2) Reliability personality scales----------------------
+
+# --> get personality data step5/7
+
+#--------3) Bar plots for descriptive data---------------------
+
+#-----Frequency of cards 
 
 Graph <- Data_sum %>% 
   dplyr::group_by(Block, Card) %>% 
@@ -74,7 +80,7 @@ ggplot(Graph, aes(x=Block, y=M,  fill=Card)) +
   theme(legend.title = element_text(size=15, face = "bold"))+
   theme(legend.text = element_text(size=12))
 
-#--------Bar plot IGT-Score per Block-----------------
+#-----IGT-Score per Block
 
 Graph3 <- dplyr::select(Data_score, VP,Block,IGT_Score)
 Graph3 <- Data_score %>% 
@@ -102,7 +108,7 @@ ggplot(Graph3, aes(x=Block, y=M, fill=Block)) +
   theme(axis.text.x = element_text(size=18))+
   theme(axis.text.y = element_text(size=18))
 
-#--------Bar plot Payoff per Block------------------------
+#------Payoff per Block
 
 Graph2 <- dplyr::select(Data_card, VP,Block,Payoff)
 Graph2 <- Data_card %>% 
@@ -130,7 +136,7 @@ ggplot(Graph2, aes(x=Block, y=M, fill=Block)) +
   theme(axis.text.x = element_text(size=18))+
   theme(axis.text.y = element_text(size=15))
 
-#--------Bar plot RT_mean by Block----------------------
+#----- RT_mean by Block
 
 Graph4 <- dplyr::select(Data_card, VP,Block,RT)
 Graph4 <- Data_card %>% 
@@ -159,7 +165,8 @@ ggplot(Graph4, aes(x=Block, y=M, fill=Block)) +
   theme(axis.text.y = element_text(size=15))
 
 
-# Check normal distribution 
+#--------4) Check normal distribution----------------------------
+
 plotNormalHistogram(Data_reg$RT_log)
 
 plotNormalHistogram(Data_reg$RT_mean)

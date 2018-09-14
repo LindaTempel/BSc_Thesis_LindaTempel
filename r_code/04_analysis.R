@@ -14,14 +14,15 @@ getPacks(pkgs)
 rm(pkgs)
 
 
+#CREATE DATA FRAMES FOR ANALYSIS
 
-#--------Merge behavioral and personality data---------
+#--------1) Merge behavioral and personality data---------
 Data_full<- merge (Data_card, Data_pers_full, by.x='VP', by.y = 'VP')
 
 Data_full$Block<-as.factor(Data_full$Block)
 
 
-#--------Data frame for frequency of cards---------
+#--------2) Data frame for frequency of cards---------
 
 Data_sum <- Data_full %>% 
   dplyr::group_by(VP, Block, Card) %>% 
@@ -29,7 +30,7 @@ Data_sum <- Data_full %>%
   dplyr::filter(!Card==0)
 
 
-#--------Calculating IGT-Score, RT mean and Payoff-------------------------
+#--------3) Calculating IGT-Score, RT mean and Payoff-------------------------
 
 #turning long into wide format
 Data_score <- dcast(Data_sum, VP + Block ~ Card, value.var="N")
@@ -37,40 +38,47 @@ Data_score <- dcast(Data_sum, VP + Block ~ Card, value.var="N")
 #Switching columns
 Data_score <- Data_score[c("VP", "Block", "A", "B", "C", "D")]
 
-#-------Calculating Score for each Block
+#----IGT-Score
+
+#Calculating Score for each Block
 Data_score[is.na(Data_score)] <- 0
 Data_score<- dplyr::mutate(Data_score,IGT_Score=((C+D)-(A+B)))
 
-#--------Select payoff at end of Block only
+#Calculating total IGT_Score
+
+Data_score_all <- Data_score %>% 
+  dplyr::group_by(VP) %>% 
+  dplyr::summarise(IGT_Score_all=sum(IGT_Score))
+
+#Merge with personality scores
+Data_pers_score_all <- merge (Data_score_all, Data_pers_score) 
+
+#----Payoff
+
+#Select payoff at end of Block only
 Data_behav3<-Data_behav %>% dplyr::select(VP, Block,Trial, Payoff)
 Data_behav3<-dplyr::filter(Data_behav3, Trial==100)
 Data_behav3<-Data_behav3 %>% dplyr::select(VP, Block,Payoff)
 
-#merge with personality
+#Add payoff to data frame
 Data_reg <- merge (Data_score, Data_behav3)
 Data_reg <- merge (Data_reg, Data_pers_score, by.x = 'VP', by.y = 'VP')
 
-#--------Calculating mean of RT for each Block
+#----RT
+
+#Calculating mean of RT for each Block
 Data_RT <- Data_card %>% 
   dplyr::group_by(VP, Block) %>% 
   dplyr::summarise(RT_mean=mean(RT))
 
-#merge into final data frame for regression
+#Add RT_mean to data frame
 Data_reg <- merge (Data_reg, Data_RT)
 
 #Log Transformation for RT
 Data_reg$RT_log = log(Data_reg$RT_mean)
 
 
-##-------Calculating total score
-Data_score_all <- Data_score %>% 
-  dplyr::group_by(VP) %>% 
-  dplyr::summarise(IGT_Score_all=sum(IGT_Score))
-
-#merge with personality scores
-Data_pers_score_all <- merge (Data_score_all, Data_pers_score)  
-
-#--------Alternative: bigger data set for Analysis with slopes------
+#--------3) Alternative: bigger data set for Analysis with slopes------
 
 Data_RT_all <- Data_card %>% 
   dplyr::group_by(VP, Block, Card) %>% 
@@ -89,7 +97,7 @@ Data_reg_all$VP <-as.factor(Data_reg_all$VP)
 Data_reg_all$RT_log = log(Data_reg_all$RT_mean)
 
 
-#--------Center around zero: Personality variables----
+#--------4) Center around zero: Personality variables----
 
 Data_reg <- within(Data_reg, {
   MAE_Score_z <- MAE_Score - mean(MAE_Score, na.rm=T)
@@ -105,31 +113,41 @@ Data_reg <- within(Data_reg, {
   SP_z <- SP - mean(SP, na.rm=T)
 })
 
-#--------Data frame for RT after losses/wins---------
+#--------5) Data frame for RT after losses/wins---------
 
 Data_RT_split<-dplyr::select(Data_full, VP, Block, RT, Card, net_payoff)
 
 Data_RT_split<-dplyr::filter(Data_RT_split, Card %in% c('A', 'B', 'C', 'D'))
 Data_RT_split$Card <- factor(Data_RT_split$Card)
 
+#Separate Data by wins and losses
 Data_RT_loss <- dplyr::filter(Data_RT_split, lag(net_payoff, 1)<0)
 Data_RT_win <- dplyr::filter(Data_RT_split, lag(net_payoff,1)>0)
 
+#Create Variable Condition
 Data_RT_loss$Cond<-c("loss")
 Data_RT_win$Cond<-c("win")
 
+#Create new data frame
 Data_loss_win<-rbind(Data_RT_loss, Data_RT_win)
 
 Data_loss_win$Cond <- as.factor(Data_loss_win$Cond)
 Data_loss_win$VP <- as.factor(Data_loss_win$VP)
 
+#Calculate mean RT
+
 Data_loss_win <- Data_loss_win %>% 
   dplyr::group_by(VP, Block, Card, Cond) %>% 
   dplyr::summarise(RT_mean=mean(RT))
 
-#Personality Data
+#log transform RT
+Data_loss_win$RT_log = log(Data_loss_win$RT_mean)
 
-#--------Correlations in Personality data----------------------
+#--------------------------------------------------------------
+
+#ANALYSIS OF PERSONALITY DATA
+
+#--------1) Correlations in Personality data----------------------
 
 
 Data_pers_score_all<- Data_pers_score %>% dplyr::select(PE, AC, SP, MAE_Score, FFFS, BIS, BAS_Rew_Int, BAS_Rew_Reac, BAS_Goal_Drive, BAS_Impulsiv, BAS_Score)
@@ -153,6 +171,7 @@ flattenCorrMatrix(matrix2$r, matrix2$P)
 rcorr(matrix, type=c("pearson"))
 matrix$P
 
+#Rename variables
 colnames(matrix2$r) <- c("Extraversion", "Wohlbefinden", "Leistung", "Soziale Stärke", 
                          "FFFS", "BIS", "BAS", "Interesse a.B.", 
                          "Reaktivität a.B.", "z. Beharrlichkeit", "Impulsivität")
@@ -160,18 +179,20 @@ rownames(matrix2$r) <- c("Extraversion", "Wohlbefinden", "Leistung", "Soziale St
                          "FFFS", "BIS", "BAS", "Interesse a.B", 
                          "Reaktivität a.B.", "z. Beharrlichkeit", "Impulsivität")
 
-# Plot:  Insignificant correlation 
+# Plot: only significant correlation 
 corrplot(matrix2$r, method=c("number"), type="full", order="original", 
          p.mat = matrix2$P, sig.level = 0.05, insig = "blank", tl.col="black", tl.srt=45)
 
-#Plot: full
+#Plot: all correlation
 corrplot(matrix2$r, method=c("number"), type="full", order="original", tl.col="black", tl.srt=45)
 
+#-------------------------------------------------------------
 
+#ANALYSIS OF BEHAVIORAL DATA
 
-#Behavioral Data
+#----------1) Chosen Decks----------------
 
-#---------------Chosen Decks----------------
+#----Model with random intercept and random slope, by Card and Block
 
 mod_card <- lmer(N ~ Card*Block + (1+Card|VP), data=Data_reg_all, REML = F)
 summary(mod_card)
@@ -180,11 +201,15 @@ emmeans(mod_card, pairwise ~ Card |Block, adjust='Bonferroni')
 
 AIC(mod_card)
 
+#Residuals ok?
+
 resid(mod_card)
 car::qqPlot(resid(mod_card))
 
 
-#---------------IGT-Score---------------------
+#----------2) IGT-Score---------------------
+
+#----Model with random intercept, by Block, BAS, BIS, FFFS, MAE
 
 m1<-lmer(IGT_Score ~ 
            Block*BAS_Score_z + 
@@ -193,12 +218,12 @@ m1<-lmer(IGT_Score ~
            Block*MAE_Score_z
          + (1|VP), data=Data_reg, REML = F)
 anova(m1)
-summary(m1)
-
-sjPlot::tab_model(m1)
+summary(m1) 
 
 sd(Data_reg$MAE_Score_z)
 sd(Data_reg$BIS_z)
+
+#Post-hoc 
 
 emmeans(m1, pairwise~Block|MAE_Score_z, at=list(MAE_Score_z = c(-13, 13)),
         adjust='Bonferroni')
@@ -206,6 +231,7 @@ emmeans(m1, pairwise~Block|BIS_z, at=list(BIS_z=c(-12, 12)),
         adjust='Bonferroni')
 emmeans(m1, pairwise~Block, adjust='Bonferroni')
 
+#Graphs
 
 visreg(m1, xvar = 'MAE_Score_z', by='Block', line=list(col='#2D718EFF'),
        gg=T) + theme_bw()+ 
@@ -225,9 +251,13 @@ visreg(m1, xvar = 'BIS_z', by='Block', line=list(col='#2D718EFF'),
   theme(axis.text.y = element_text(size = 15))+
   theme(strip.text = element_text(size = 12, face="bold"))      
 
+#Residuals ok?
+
 resid(m1)
 car::qqPlot(resid(m1))
 
+
+#----Model with random intercept, by Block, Rew_Int, Rew_Reac, Goal_Drive, Impulsiv (BAS-Subscales)
 
 m2<-lmer(IGT_Score ~ 
            Block*BAS_Rew_Int_z +
@@ -239,6 +269,8 @@ summary(m2)
 
 sd(Data_reg$BAS_Goal_Drive_z)
 sd(Data_reg$BAS_Rew_Int_z)
+
+#Post-hoc
 
 emmeans(m2, pairwise~Block|BAS_Goal_Drive_z,at=list(BAS_Goal_Drive_z= c(-3,3)), 
         adjust='Bonferroni')
@@ -254,6 +286,7 @@ emtrends(m2, var='BAS_Rew_Int_z', ~1,
          at=list(BAS_Goal_Drive_z=0, BAS_Rew_Reac_z=0, BAS_Impulsiv_z=0), 
          adjust='Bonferroni')
 
+#Graphs
 
 visreg(m2, xvar = 'BAS_Goal_Drive_z', by='Block',line=list(col='#2D718EFF'),
        gg=T) + theme_bw()+
@@ -287,9 +320,13 @@ visreg(m2, xvar='BAS_Goal_Drive_z', line=list(col='#2D718EFF'),
   theme(axis.text.x = element_text(size = 15))+
   theme(axis.text.y = element_text(size = 15))
 
+#Residuals ok?
 
 resid(m2)
 car::qqPlot(resid(m2))
+
+
+#----Model with random intercept, by Block, PE, AC, SP (MAE-Subscales)
 
 m3<-lmer(IGT_Score ~   
            Block*PE_z + 
@@ -301,9 +338,13 @@ summary(m3)
 
 sd(Data_reg$SP_z)
 
+#Post-hoc
+
 emmeans(m3, pairwise~Block|SP_z,at=list(SP_z=c(-7,7)),
         adjust='Bonferroni')
 emmeans(m3, pairwise~Block, adjust='Bonferroni')
+
+#Graphs
 
 visreg(m3, xvar = 'SP_z', by='Block',line=list(col='#2D718EFF'),
        gg=T) + theme_bw()+ 
@@ -314,12 +355,18 @@ visreg(m3, xvar = 'SP_z', by='Block',line=list(col='#2D718EFF'),
   theme(axis.text.y = element_text(size = 15))+
   theme(strip.text = element_text(size = 12, face="bold")) 
 
+#Residuals ok?
+
 resid(m3)
 car::qqPlot(resid(m3))
 
-#---------------Payofff------------------
+#----------3) Payofff------------------
+
+#Correlation IGT-Score and Payoff
 
 cor.test(Data_reg$IGT_Score, Data_reg$Payoff)
+
+#----Model with random intercept, by Block, BAS, BIS, FFFS, MAE
 
 m1<-lmer(Payoff~Block*BAS_Score_z+
            Block*BIS_z+
@@ -331,11 +378,15 @@ summary(m1)
 sd(Data_reg$MAE_Score_z)
 sd(Data_reg$BIS_z)
 
+#Post-hoc
+
 emmeans(m1, pairwise~Block|BIS_z,at=list(BIS_z=c(-12,12)),
         adjust='Bonferroni')
 emmeans(m1, pairwise~Block|MAE_Score_z,at=list(MAE_Score_z=c(-13,13)),
         adjust='Bonferroni')
 emmeans(m1, pairwise~Block, adjust='Bonferroni')
+
+#Graphs
 
 visreg(m1, xvar = 'MAE_Score_z', by='Block',line=list(col='#20A386FF'),
        gg=T) + theme_bw()+
@@ -355,8 +406,13 @@ visreg(m1, xvar = 'BIS_z', by='Block',line=list(col='#20A386FF'),
   theme(axis.text.y = element_text(size = 15))+
   theme(strip.text = element_text(size = 12, face="bold"))
 
+#Residuals ok?
+
 resid(m1)
 car::qqPlot(resid(m1))
+
+
+#----Model with random intercept, by Block, Rew_Int, Rew_Reac, Goal_Drive, Impulsiv (BAS-Subscales)
 
 m2<-lmer(Payoff~Block*BAS_Rew_Int_z+ 
            Block*BAS_Rew_Reac_z+ 
@@ -365,6 +421,8 @@ m2<-lmer(Payoff~Block*BAS_Rew_Int_z+
 anova(m2)
 summary(m2)
 
+#Post-hoc
+
 emmeans(m2, pairwise~Block, adjust='Bonferroni')
 emtrends(m2, var='BAS_Goal_Drive_z', ~1, 
          at=list(BAS_Rew_Int_z=0, BAS_Rew_Reac_z=0, BAS_Impulsiv_z=0), 
@@ -372,6 +430,8 @@ emtrends(m2, var='BAS_Goal_Drive_z', ~1,
 emtrends(m2, var='BAS_Rew_Reac_z', ~1, 
          at=list(BAS_Goal_Drive_z=0, BAS_Rew_Int_z=0, BAS_Impulsiv_z=0), 
          adjust='Bonferroni')
+
+#Graphs
 
 visreg(m2, xvar='BAS_Goal_Drive_z', line=list(col='#20A386FF'),
        xlab=("Zielgerichtete Beharrlichkeit"), ylab=("Punktestand"), gg=T)+ theme_bw()+
@@ -387,9 +447,13 @@ visreg(m2, xvar='BAS_Rew_Reac_z', line=list(col='#20A386FF'),
   theme(axis.text.x = element_text(size = 15))+
   theme(axis.text.y = element_text(size = 15))
 
+#Residuals ok?
+
 resid(m2)
 car::qqPlot(resid(m2))
 
+
+#----Model with random intercept, by Block, PE, AC, SP (MAE-Subscales)
 
 m3<-lmer(Payoff~Block*PE_z+
            Block*AC_z+
@@ -399,9 +463,13 @@ summary(m3)
 
 sd(Data_reg$SP_z)
 
+#Post-hoc
+
 emmeans(m3, pairwise~Block|SP_z, at=list(Sp_z=c(-7, 7)),
         adjust='Bonferroni')
 emmeans(m3, pairwise~Block, adjust='Bonferroni')
+
+#Graphs
 
 visreg(m3, xvar = 'SP_z', by='Block',line=list(col='#20A386FF'),
        gg=T) + theme_bw()+ 
@@ -412,11 +480,14 @@ visreg(m3, xvar = 'SP_z', by='Block',line=list(col='#20A386FF'),
   theme(axis.text.y = element_text(size = 15))+
   theme(strip.text = element_text(size = 12, face="bold")) 
 
+#Residuals ok?
 
 resid(m3)
 car::qqPlot(resid(m3))
 
-#---------------RT_log-----------------
+#----------4) RT_log-----------------
+
+#----Model with random intercept, by Block, BAS, BIS, FFFS, MAE
 
 m1<-lmer(RT_log ~ 
            Block*BAS_Score_z +
@@ -426,6 +497,8 @@ m1<-lmer(RT_log ~
 anova(m1)
 summary(m1)
 
+#Post-hoc
+
 emmeans(m1, pairwise~Block, adjust='Bonferroni')
 emtrends(m1, var='BAS_Score_z', ~1, 
          at=list(BIS_z=0, FFFS_z=0, MAE_Score_z=0), 
@@ -433,6 +506,8 @@ emtrends(m1, var='BAS_Score_z', ~1,
 emtrends(m1, var='FFFS_z', ~1, 
          at=list(BAS_Score_z=0, BIS_z=0, MAE_Score_z=0), 
          adjust='Bonferroni')
+
+#Graphs
 
 visreg(m1, xvar='Block', line=list(col='#481568FF'),
        xlab=("Block"), ylab=("Reaktionszeit"), gg=T)+ theme_bw()+
@@ -456,10 +531,13 @@ visreg(m1, xvar='FFFS_z', line=list(col='#481568FF'),
   theme(axis.text.x = element_text(size = 15))+
   theme(axis.text.y = element_text(size = 15))
 
+#Residuals ok?
 
 resid(m1)
 car::qqPlot(resid(m1))
 
+
+#----Model with random intercept, by Block, Rew_Int, Rew_Reac, Goal_Drive, Impulsiv (BAS-Subscales)
 
 m2<-lmer(RT_log ~ 
            Block*BAS_Rew_Int_z + 
@@ -471,9 +549,13 @@ summary(m2)
 
 sd(Data_reg$BAS_Rew_Int_z)
 
+#Post-hoc
+
 emmeans(m2, pairwise~Block|BAS_Rew_Int_z, at=list(BAS_Rew_Int_z=c(-3,3)),
         adjust='Bonferroni')
 emmeans(m2, pairwise~Block, adjust='Bonferroni')
+
+#Graphs
 
 visreg(m2, xvar = 'BAS_Rew_Int_z', by='Block',line=list(col='#481568FF'),
        gg=T) + theme_bw()+ 
@@ -484,9 +566,13 @@ visreg(m2, xvar = 'BAS_Rew_Int_z', by='Block',line=list(col='#481568FF'),
   theme(axis.text.y = element_text(size = 15))+
   theme(strip.text = element_text(size = 12, face="bold"))
 
+#Residuals ok?
+
 resid(m2)
 car::qqPlot(resid(m2))
 
+
+#----Model with random intercept, by Block, PE, AC, SP (MAE-Subscales)
 
 m3<-lmer(RT_log ~ 
            Block*PE_z +
@@ -495,35 +581,51 @@ m3<-lmer(RT_log ~
 anova(m3)
 summary(m3)
 
+#Post-hoc
+
 emmeans(m3, pairwise~Block, adjust='Bonferroni')
+
+#Residuals ok?
 
 resid(m3)
 car::qqPlot(resid(m3))
 
+#----Model with random intercept, by Block only
 
 m4<-lmer(RT_log~Block + (1|VP), data = Data_reg, REML = F)
 anova(m4)
 summary(m4)
 
+#Post-hoc
+
 emmeans(m4, pairwise ~ Block, adjust='Bonferroni')
+
+# Residuals ok?
 
 resid(m4)
 car::qqPlot(resid(m4))
 
-# RT after losses
 
-Data_loss_win$RT_log = log(Data_loss_win$RT_mean)
+#----RT after losses
+
+#Model with intercept, by Card, Cond and Block
 
 m1<-lmer(RT_log ~  Cond * Card + Card * Block + Cond * Block+ 
            (1|VP), data = Data_loss_win, REML=F)
 summary(m1)
 anova(m1)
 
-resid(m1)
-car::qqPlot(resid(m1))
+#Post-hoc
 
 emmeans(m1, pairwise ~ Block | Cond, adjust='Bonferroni')
 emmeans(m1, pairwise ~ Cond | Block, adjust='Bonferroni')
+
+#Residuals ok?
+
+resid(m1)
+car::qqPlot(resid(m1))
+
+#Graphs
 
 emmip(m1, Cond ~ Block, CIs=T,engine ="ggplot") + theme_bw() + 
   theme(axis.text.x = element_text(size = 13)) + 
@@ -558,7 +660,7 @@ emmip(m1, Card~Block|Cond, CIs=T)+ theme_bw()
 emmip(m1, Block~Card|Cond, CIs=T)+ theme_bw()
 
 
-#Tables (for basic layout, needs to be filled in by hand)
+#----------5) Tables (for basic layout, needs to be filled in by hand)--------------
 
 apa.reg.table(m1_1, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table11.doc", table.number = 1)
 
