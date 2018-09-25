@@ -155,14 +155,18 @@ Data_reg$RT_log = log(Data_reg$RT_mean)
 #--------1) Correlations in Personality data----------------------
 
 
-Data_pers_score_all<- Data_pers_score %>% dplyr::select(PE, AC, SP, MAE_Score, FFFS, BIS, BAS_Rew_Int, BAS_Rew_Reac, BAS_Goal_Drive, BAS_Impulsiv, BAS_Score)
+Data_pers_score_all<- Data_pers_score %>% dplyr::select(PE, AC, SP, MAE_Score, FFFS, 
+                                                        BIS, BAS_Rew_Int, BAS_Rew_Reac, 
+                                                        BAS_Goal_Drive, BAS_Impulsiv, 
+                                                        BAS_Score)
 
 matrix <- cor(Data_pers_score_all)
 round(matrix,2)
 
 #Switching columns
-Data_pers_score_all <- Data_pers_score_all[c("MAE_Score", "PE", "AC", "SP", "FFFS", "BIS", "BAS_Score",
-                                             "BAS_Rew_Int", "BAS_Rew_Reac", "BAS_Goal_Drive", "BAS_Impulsiv")]
+Data_pers_score_all <- Data_pers_score_all[c("MAE_Score", "PE", "AC", "SP", "FFFS", "BIS", 
+                                             "BAS_Score", "BAS_Rew_Int", "BAS_Rew_Reac", 
+                                             "BAS_Goal_Drive", "BAS_Impulsiv")]
 
 matrix2<-rcorr(as.matrix(Data_pers_score_all), type=c("pearson"))
 
@@ -210,7 +214,8 @@ summary(mod_card)
 
 #Post-hoc
 
-emmeans(mod_card, pairwise ~ Card |Block, adjust='Bonferroni')
+emmeans(mod_card, pairwise ~ Card |Block, 
+        adjust='Bonferroni')
 
 #Residuals ok?
 
@@ -233,7 +238,7 @@ sjPlot::tab_model(mod_card,  show.aic = T, show.std = T, show.r2 = T,
                                   "Karte B*Block 3", "Karte C*Block 3", "Karte D*Block 3"), 
                   dv.labels='Wahl der Stapel')
 
-#change order of levels back to normal
+#change order of levels back to initial order
 Data_reg_all$Block <- factor(Data_reg_all$Block, levels = c('1', '2', '3'))  
 contrasts(Data_reg_all$Block) <- contr.sum(3); contrasts(Data_reg_all$Block)
 Data_reg_all$Card <- factor(Data_reg_all$Card, levels = c('A', 'B', 'C', 'D'))
@@ -242,6 +247,10 @@ contrasts(Data_reg_all$Card)  <- contr.sum(4);contrasts(Data_reg_all$Card)
 
 
 #--------2) IGT-Score---------------------
+
+#Effect-coding
+
+contrasts(Data_reg$Block) <- contr.sum(3); contrasts(Data_reg$Block)
 
 #----Model with random intercept, by Block, BAS, BIS, FFFS, MAE
 
@@ -315,7 +324,7 @@ sjPlot::tab_model(m1, show.aic = T, show.std = T, show.r2 = T, string.pred = 'Pr
                                   "Block 3*Extraversion"), 
                   dv.labels='IGT-Score')
 
-#change order of levels back to normal
+#change order of levels back to initial order
 Data_reg$Block <- factor(Data_reg$Block, levels = c('1', '2', '3'))  
 contrasts(Data_reg$Block) <- contr.sum(3); contrasts(Data_reg$Block)
 #refit model#
@@ -418,7 +427,7 @@ sjPlot::tab_model(m2, show.aic = T, show.std = T, show.r2 = T, string.pred = 'Pr
                                   "Block 2*Impulsivität", "Block 3*Impulsivität"), 
                   dv.labels='IGT-Score')
 
-#change order of levels back to normal
+#change order of levels back to initial order
 Data_reg$Block <- factor(Data_reg$Block, levels = c('1', '2', '3'))  
 contrasts(Data_reg$Block) <- contr.sum(3); contrasts(Data_reg$Block)
 #refit model#
@@ -479,7 +488,7 @@ sjPlot::tab_model(m3, show.aic = T, show.std = T, show.r2 = T, string.pred = 'Pr
                                   "Block 2*soziale Stärke", "Block 3*soziale Stärke"), 
                   dv.labels='IGT-Score')
 
-#change order of levels back to normal
+#change order of levels back to initial order
 Data_reg$Block <- factor(Data_reg$Block, levels = c('1', '2', '3'))  
 contrasts(Data_reg$Block) <- contr.sum(3); contrasts(Data_reg$Block)
 #refit model#
@@ -561,7 +570,7 @@ sjPlot::tab_model(m1, show.aic = T, show.std = T, show.r2 = T, string.pred = 'Pr
                                   "Block 2*Extraversion", "Block 3*Extraversion"), 
                   dv.labels='Punktestand')
 
-#change order of levels back to normal
+#change order of levels back to initial order
 Data_reg$Block <- factor(Data_reg$Block, levels = c('1', '2', '3'))  
 contrasts(Data_reg$Block) <- contr.sum(3); contrasts(Data_reg$Block)
 #refit model#
@@ -633,7 +642,7 @@ sjPlot::tab_model(m2,m2_1, show.aic = T, show.std = T, show.r2 = T, string.pred 
                                   "Block 2*Impulsivität", "Block 3*Impulsivität"), 
                   dv.labels='Punktestand')
 
-#change order of levels back to normal
+#change order of levels back to initial order
 Data_reg$Block <- factor(Data_reg$Block, levels = c('1', '2', '3'))  
 contrasts(Data_reg$Block) <- contr.sum(3); contrasts(Data_reg$Block)
 #refit model#
@@ -692,7 +701,7 @@ sjPlot::tab_model(m3, show.aic = T, show.std = T, show.r2 = T, string.pred = 'Pr
                                   "Block 2*soziale Stärke", "Block 3*soziale Stärke"), 
                   dv.labels='Punktestand')
 
-#change order of levels back to normal
+#change order of levels back to initial order
 Data_reg$Block <- factor(Data_reg$Block, levels = c('1', '2', '3'))  
 contrasts(Data_reg$Block) <- contr.sum(3); contrasts(Data_reg$Block)
 #refit model#
@@ -780,7 +789,7 @@ sjPlot::tab_model(m1,m0, show.aic = T, show.std = T, show.r2 = T, string.pred = 
                                   "Block 2*Extraversion", "Block 3*Extraversion"), 
                   dv.labels='Reaktionszeit')
 
-#change order of levels back to normal
+#change order of levels back to initial order
 Data_reg$Block <- factor(Data_reg$Block, levels = c('1', '2', '3'))  
 contrasts(Data_reg$Block) <- contr.sum(3); contrasts(Data_reg$Block)
 #refit model#
@@ -853,7 +862,7 @@ sjPlot::tab_model(m2,m02, show.aic = T, show.std = T, show.r2 = T, string.pred =
                                   "Block 2*Impulsivität", "Block 3*Impulsivität"), 
                   dv.labels='Reaktionszeit')
 
-#change order of levels back to normal
+#change order of levels back to initial order
 Data_reg$Block <- factor(Data_reg$Block, levels = c('1', '2', '3'))  
 contrasts(Data_reg$Block) <- contr.sum(3); contrasts(Data_reg$Block)
 #refit model#
@@ -916,7 +925,7 @@ sjPlot::tab_model(m3_1, m03, show.aic = T, show.std = T, show.r2 = T,
                                   "soziale Stärke"), 
                   dv.labels='Reaktionszeit')
 
-#change order of levels back to normal
+#change order of levels back to initial order
 Data_reg$Block <- factor(Data_reg$Block, levels = c('1', '2', '3'))  
 contrasts(Data_reg$Block) <- contr.sum(3); contrasts(Data_reg$Block)
 #refit model#
@@ -976,7 +985,7 @@ sjPlot::tab_model(m1_1, show.aic = T, show.std = T, show.r2 = T, string.pred = '
                                   "Block 2", "Block 3"), 
                   dv.labels='Reaktionszeit')
 
-#change order of levels back to normal
+#change order of levels back to initial order
 Data_loss_win$Block <- factor(Data_loss_win$Block, levels = c('1', '2', '3'))
 contrasts(Data_loss_win$Block) <- contr.sum(3); contrasts(Data_loss_win$Block)
 #refit model#
