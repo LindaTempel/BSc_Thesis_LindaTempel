@@ -175,7 +175,9 @@ plotNormalHistogram(Data_reg$IGT_Score)
 
 plotNormalHistogram(Data_reg$Payoff)
 
-plotNormalHistogram(Data_full$RT)
-
 plotNormalHistogram(Data_reg_all$N)
+
+Data_reg<- dplyr::mutate(Data_reg,RT_in=-1000/RT_mean)
+
+plotNormalHistogram(Data_reg$RT_in)
 

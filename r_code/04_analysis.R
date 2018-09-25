@@ -9,7 +9,7 @@ source('./r_functions/flattenCorrMatrix.R')
 pkgs <- c('dplyr', 'plyr', 'Hmisc', 'multcomp', 'effects', 'phia', 'emmeans', 'lme4',
           'sjPlot', 'lmerTest', 'stargazer', 'lemon', 'gridExtra', 'ggplot2', 'tidyr',
           'reshape2', 'corrplot', 'visreg', 'pwr', 'lattice', 'viridis', 'rcompanion',
-          'apaTables', 'scales')
+          'apaTables', 'scales', 'sjstats')
 getPacks(pkgs)
 rm(pkgs)
 
@@ -77,6 +77,7 @@ Data_reg <- merge (Data_reg, Data_RT)
 #Log Transformation for RT
 Data_reg$RT_log = log(Data_reg$RT_mean)
 
+rm(Data_behav3, Data_score, Data_score_all)
 
 #--------3) Alternative: bigger data set for Analysis with slopes------
 
@@ -134,6 +135,8 @@ Data_loss_win<-rbind(Data_RT_loss, Data_RT_win)
 Data_loss_win$Cond <- as.factor(Data_loss_win$Cond)
 Data_loss_win$VP <- as.factor(Data_loss_win$VP)
 
+rm(Data_RT_loss, Data_RT_win, Data_RT_split)
+
 #Calculate mean RT
 
 Data_loss_win <- Data_loss_win %>% 
@@ -142,6 +145,8 @@ Data_loss_win <- Data_loss_win %>%
 
 #log transform RT
 Data_loss_win$RT_log = log(Data_loss_win$RT_mean)
+Data_reg$RT_log = log(Data_reg$RT_mean)
+
 
 #--------------------------------------------------------------
 
@@ -172,10 +177,10 @@ rcorr(matrix, type=c("pearson"))
 matrix$P
 
 #Rename variables
-colnames(matrix2$r) <- c("Extraversion", "Wohlbefinden", "Leistung", "Soziale Stärke", 
+colnames(matrix2$r) <- c("Extraversion", "Glücklichkeit", "Leistung", "Soziale Stärke", 
                          "FFFS", "BIS", "BAS", "Interesse a.B.", 
                          "Reaktivität a.B.", "z. Beharrlichkeit", "Impulsivität")
-rownames(matrix2$r) <- c("Extraversion", "Wohlbefinden", "Leistung", "Soziale Stärke", 
+rownames(matrix2$r) <- c("Extraversion", "Glücklichkeit", "Leistung", "Soziale Stärke", 
                          "FFFS", "BIS", "BAS", "Interesse a.B", 
                          "Reaktivität a.B.", "z. Beharrlichkeit", "Impulsivität")
 
@@ -186,28 +191,57 @@ corrplot(matrix2$r, method=c("number"), type="full", order="original",
 #Plot: all correlation
 corrplot(matrix2$r, method=c("number"), type="full", order="original", tl.col="black", tl.srt=45)
 
-#-------------------------------------------------------------
+#--------------------------------------------------------------
 
 #ANALYSIS OF BEHAVIORAL DATA
 
-#----------1) Chosen Decks----------------
+#--------1) Chosen Decks----------------
+
+#Effect-coding
+contrasts(Data_reg_all$Block) <- contr.sum(3); contrasts(Data_reg_all$Block)
+Data_reg_all$Card <-droplevels.factor(Data_reg_all$Card, exclude= c(0))
+contrasts(Data_reg_all$Card)  <- contr.sum(4);contrasts(Data_reg_all$Card)
 
 #----Model with random intercept and random slope, by Card and Block
 
 mod_card <- lmer(N ~ Card*Block + (1+Card|VP), data=Data_reg_all, REML = F)
-summary(mod_card)
 anova(mod_card)
-emmeans(mod_card, pairwise ~ Card |Block, adjust='Bonferroni')
+summary(mod_card)
 
-AIC(mod_card)
+#Post-hoc
+
+emmeans(mod_card, pairwise ~ Card |Block, adjust='Bonferroni')
 
 #Residuals ok?
 
-resid(mod_card)
-car::qqPlot(resid(mod_card))
+sjPlot::plot_model(mod_card, "diag")
+
+#change order of levels 
+Data_reg_all$Block <- factor(Data_reg_all$Block, levels = c('2', '3', '1'))
+contrasts(Data_reg_all$Block) <- contr.sum(3); contrasts(Data_reg_all$Block)
+Data_reg_all$Card <- factor(Data_reg_all$Card, levels = c('B', 'C', 'D', 'A'))
+contrasts(Data_reg_all$Card)  <- contr.sum(4);contrasts(Data_reg_all$Card)
+#refit model#
+
+#get table
+
+sjPlot::tab_model(mod_card,  show.aic = T, show.std = T, show.r2 = T, 
+                  string.pred = 'Prädiktoren', 
+                  pred.labels = c("(Intercept)","Karte B", "Karte C", "Karte D",
+                                  "Block 2", "Block 3",
+                                  "Karte B*Block 2", "Karte C*Block 2", "Karte D*Block 2", 
+                                  "Karte B*Block 3", "Karte C*Block 3", "Karte D*Block 3"), 
+                  dv.labels='Wahl der Stapel')
+
+#change order of levels back to normal
+Data_reg_all$Block <- factor(Data_reg_all$Block, levels = c('1', '2', '3'))  
+contrasts(Data_reg_all$Block) <- contr.sum(3); contrasts(Data_reg_all$Block)
+Data_reg_all$Card <- factor(Data_reg_all$Card, levels = c('A', 'B', 'C', 'D'))
+contrasts(Data_reg_all$Card)  <- contr.sum(4);contrasts(Data_reg_all$Card)
+#refit model#
 
 
-#----------2) IGT-Score---------------------
+#--------2) IGT-Score---------------------
 
 #----Model with random intercept, by Block, BAS, BIS, FFFS, MAE
 
@@ -215,8 +249,7 @@ m1<-lmer(IGT_Score ~
            Block*BAS_Score_z + 
            Block*BIS_z + 
            Block*FFFS_z + 
-           Block*MAE_Score_z
-         + (1|VP), data=Data_reg, REML = F)
+           Block*MAE_Score_z + (1|VP), data=Data_reg, REML = F)
 anova(m1)
 summary(m1) 
 
@@ -225,36 +258,67 @@ sd(Data_reg$BIS_z)
 
 #Post-hoc 
 
-emmeans(m1, pairwise~Block|MAE_Score_z, at=list(MAE_Score_z = c(-13, 13)),
+emmeans(m1, pairwise~Block|MAE_Score_z, 
+        at=list(MAE_Score_z = c(-13, 13)),
         adjust='Bonferroni')
-emmeans(m1, pairwise~Block|BIS_z, at=list(BIS_z=c(-12, 12)),
+emmeans(m1, pairwise~Block|BIS_z, 
+        at=list(BIS_z=c(-12, 12)),
         adjust='Bonferroni')
-emmeans(m1, pairwise~Block, adjust='Bonferroni')
+emmeans(m1, pairwise~Block, 
+        adjust='Bonferroni')
 
 #Graphs
 
-visreg(m1, xvar = 'MAE_Score_z', by='Block', line=list(col='#2D718EFF'),
-       gg=T) + theme_bw()+ 
-  xlab("Extraversion")+ ylab("IGT-Score")+
-  theme(axis.title.x = element_text(size=18))+
-  theme(axis.title.y = element_text(size=18))+
-  theme(axis.text.x = element_text(size = 15))+
-  theme(axis.text.y = element_text(size = 15))+
-  theme(strip.text = element_text(size = 12, face="bold"))
+emmip(m1,Block ~ MAE_Score_z, at = list(MAE_Score_z = c(-13, 13)), 
+      CIs=T,engine ="ggplot") + theme_bw() + 
+      theme(axis.text.x = element_text(size = 13)) + 
+      theme(axis.title.x = element_text(size=15))+
+      theme(axis.title.y = element_text(size=15))+
+      theme(axis.text.y = element_text(size=13))+
+      scale_color_manual(values = viridis(3, option = 'D', end=.6, direction = -1),
+                     (name="Block"), labels=c("1", "2", "3"))+
+      theme(legend.text = element_text(size=10))+
+      theme(legend.title = element_text(size = 10, face = "bold" ))+
+      xlab("Extraversion") + ylab("IGT-Score")  +
+      scale_x_discrete(labels=c("-13" = "-1SD", "13" = "+1SD"))
 
-visreg(m1, xvar = 'BIS_z', by='Block', line=list(col='#2D718EFF'),
-       gg=T) + theme_bw()+ 
-  xlab("BIS")+ ylab("IGT-Score")+
-  theme(axis.title.x = element_text(size=18))+
-  theme(axis.title.y = element_text(size=18))+
-  theme(axis.text.x = element_text(size = 15))+
-  theme(axis.text.y = element_text(size = 15))+
-  theme(strip.text = element_text(size = 12, face="bold"))      
+emmip(m1,Block ~ BIS_z, at = list(BIS_z = c(-12, 12)), 
+      CIs=T,engine ="ggplot") + theme_bw() + 
+      theme(axis.text.x = element_text(size = 13)) + 
+      theme(axis.title.x = element_text(size=15))+
+      theme(axis.title.y = element_text(size=15))+
+      theme(axis.text.y = element_text(size=13))+
+      scale_color_manual(values = viridis(3, option = 'D', end=.6, direction = -1),
+                         (name="Block"), labels=c("1", "2", "3"))+
+      theme(legend.text = element_text(size=10))+
+      theme(legend.title = element_text(size = 10, face = "bold" ))+
+      xlab("BIS") + ylab("IGT-Score") +
+      scale_x_discrete(labels=c("-12" = "-1SD", "12" = "+1SD"))
 
 #Residuals ok?
 
-resid(m1)
-car::qqPlot(resid(m1))
+sjPlot::plot_model(m1, "diag") 
+
+#change order of levels
+Data_reg$Block <- factor(Data_reg$Block, levels = c('2', '3', '1'))
+contrasts(Data_reg$Block) <- contr.sum(3); contrasts(Data_reg$Block)
+#refit model#
+
+#Get table
+
+sjPlot::tab_model(m1, show.aic = T, show.std = T, show.r2 = T, string.pred = 'Prädiktoren', 
+                  pred.labels = c("(Intercept)","Block 2",
+                                  "Block 3", "BAS", "BIS", "FFFS", 
+                                  "Extraversion", "Block 2*BAS", "Block 3*BAS", 
+                                  "Block 2*BIS", "Block 3*BIS", "Block 2*FFFS", 
+                                  "Block 3*FFFS", "Block 2*Extraversion", 
+                                  "Block 3*Extraversion"), 
+                  dv.labels='IGT-Score')
+
+#change order of levels back to normal
+Data_reg$Block <- factor(Data_reg$Block, levels = c('1', '2', '3'))  
+contrasts(Data_reg$Block) <- contr.sum(3); contrasts(Data_reg$Block)
+#refit model#
 
 
 #----Model with random intercept, by Block, Rew_Int, Rew_Reac, Goal_Drive, Impulsiv (BAS-Subscales)
@@ -272,12 +336,15 @@ sd(Data_reg$BAS_Rew_Int_z)
 
 #Post-hoc
 
-emmeans(m2, pairwise~Block|BAS_Goal_Drive_z,at=list(BAS_Goal_Drive_z= c(-3,3)), 
+emmeans(m2, pairwise~Block|BAS_Goal_Drive_z,
+        at=list(BAS_Goal_Drive_z= c(-3,3)), 
         adjust='Bonferroni')
-emmeans(m2, pairwise~Block|BAS_Rew_Int_z, at=list(BAS_Rew_Int_z = c(-3, 3)),
+emmeans(m2, pairwise~Block|BAS_Rew_Int_z, 
+        at=list(BAS_Rew_Int_z = c(-3, 3)),
         adjust='Bonferroni')
-emmeans(m2, pairwise~Block, adjust='Bonferroni')
-emmeans(m2, pairwise~BAS_Rew_Int_z, adjust='Bonferroni')
+emmeans(m2, pairwise~Block, 
+        adjust='Bonferroni')
+
 
 emtrends(m2, var='BAS_Goal_Drive_z', ~1, 
          at=list(BAS_Rew_Int_z=0, BAS_Rew_Reac_z=0, BAS_Impulsiv_z=0), 
@@ -288,42 +355,73 @@ emtrends(m2, var='BAS_Rew_Int_z', ~1,
 
 #Graphs
 
-visreg(m2, xvar = 'BAS_Goal_Drive_z', by='Block',line=list(col='#2D718EFF'),
-       gg=T) + theme_bw()+
-  xlab("Zielgerichtete Beharrlichkeit")+ ylab("IGT-Score")+
-  theme(axis.title.x = element_text(size=18))+
-  theme(axis.title.y = element_text(size=18))+
-  theme(axis.text.x = element_text(size = 15))+
-  theme(axis.text.y = element_text(size = 15))+
-  theme(strip.text = element_text(size = 12, face="bold")) 
+emmip(m2,Block ~ BAS_Goal_Drive_z, at = list(BAS_Goal_Drive_z = c(-3, 3)), 
+      CIs=T,engine ="ggplot") + theme_bw() + 
+      theme(axis.text.x = element_text(size = 13)) + 
+      theme(axis.title.x = element_text(size=15))+
+      theme(axis.title.y = element_text(size=15))+
+      theme(axis.text.y = element_text(size=13))+
+      scale_color_manual(values = viridis(3, option = 'D', end=.6, direction = -1),
+                         (name="Block"), labels=c("1", "2", "3"))+
+      theme(legend.text = element_text(size=10))+
+      theme(legend.title = element_text(size = 10, face = "bold" ))+
+      xlab("Zielgerichtete Beharrlichkeit") + ylab("IGT-Score")+ 
+      scale_x_discrete(labels=c("-3" = "-1SD", "3" = "+1SD"))
 
-visreg(m2, xvar = 'BAS_Rew_Int_z', by='Block',line=list(col='#2D718EFF'),
-       gg=T) + theme_bw()+
-  xlab("Interesse an Belohnung")+ ylab("IGT-Score")+
-  theme(axis.title.x = element_text(size=18))+
-  theme(axis.title.y = element_text(size=18))+
-  theme(axis.text.x = element_text(size = 15))+
-  theme(axis.text.y = element_text(size = 15))+
-  theme(strip.text = element_text(size = 12, face="bold")) 
+emmip(m2,Block ~ BAS_Rew_Int_z, at = list(BAS_Rew_Int_z = c(-3, 3)), 
+      CIs=T,engine ="ggplot") + theme_bw() + 
+      theme(axis.text.x = element_text(size = 13)) + 
+      theme(axis.title.x = element_text(size=15))+
+      theme(axis.title.y = element_text(size=15))+
+      theme(axis.text.y = element_text(size=13))+
+      scale_color_manual(values = viridis(3, option = 'D', end=.6, direction = -1),
+                         (name="Block"), labels=c("1", "2", "3"))+
+      theme(legend.text = element_text(size=10))+
+      theme(legend.title = element_text(size = 10, face = "bold" ))+
+      xlab("Interesse an Belohnung") + ylab("IGT-Score") +
+      scale_x_discrete(labels=c("-3" = "-1SD", "3" = "+1SD"))
 
 visreg(m2, xvar= 'BAS_Rew_Int_z', line=list(col='#2D718EFF'), 
        xlab=("Interesse an Belohnung"), ylab=("IGT-Score"),gg=T)+ theme_bw()+
-  theme(axis.title.x = element_text(size=18))+
-  theme(axis.title.y = element_text(size=18))+
-  theme(axis.text.x = element_text(size = 15))+
-  theme(axis.text.y = element_text(size = 15))
+      theme(axis.title.x = element_text(size=18))+
+      theme(axis.title.y = element_text(size=18))+
+      theme(axis.text.x = element_text(size = 15))+
+      theme(axis.text.y = element_text(size = 15))
 
 visreg(m2, xvar='BAS_Goal_Drive_z', line=list(col='#2D718EFF'),
        xlab=("Zielgerichtete Beharrlichkeit"), ylab=("IGT-Score"), gg=T)+ theme_bw()+
-  theme(axis.title.x = element_text(size=18))+
-  theme(axis.title.y = element_text(size=18))+
-  theme(axis.text.x = element_text(size = 15))+
-  theme(axis.text.y = element_text(size = 15))
+      theme(axis.title.x = element_text(size=18))+
+      theme(axis.title.y = element_text(size=18))+
+      theme(axis.text.x = element_text(size = 15))+
+      theme(axis.text.y = element_text(size = 15))
 
 #Residuals ok?
 
-resid(m2)
-car::qqPlot(resid(m2))
+sjPlot::plot_model(m2,"diag")
+
+#change order of levels 
+Data_reg$Block <- factor(Data_reg$Block, levels = c('2', '3', '1'))
+contrasts(Data_reg$Block) <- contr.sum(3); contrasts(Data_reg$Block)
+#refit model#
+
+#Get table
+
+sjPlot::tab_model(m2, show.aic = T, show.std = T, show.r2 = T, string.pred = 'Prädiktoren', 
+                  pred.labels = c("(Intercept)","Block 2",
+                                  "Block 3", "Interesse a. Belohnung", 
+                                  "Reaktivität a. Belohnung", "z. Beharrlichkeit",
+                                  "Impulsivität","Block 2*Interesse a. Belohnung", 
+                                  "Block 3*Interesse a. Belohnung",
+                                  "Block 2*Reaktivität a. Belohnung", 
+                                  "Block 3*Reaktivität a. Belohnung",
+                                  "Block 2*z. Beharrlichkeit", "Block 3*z. Beharrlichkeit", 
+                                  "Block 2*Impulsivität", "Block 3*Impulsivität"), 
+                  dv.labels='IGT-Score')
+
+#change order of levels back to normal
+Data_reg$Block <- factor(Data_reg$Block, levels = c('1', '2', '3'))  
+contrasts(Data_reg$Block) <- contr.sum(3); contrasts(Data_reg$Block)
+#refit model#
 
 
 #----Model with random intercept, by Block, PE, AC, SP (MAE-Subscales)
@@ -340,27 +438,53 @@ sd(Data_reg$SP_z)
 
 #Post-hoc
 
-emmeans(m3, pairwise~Block|SP_z,at=list(SP_z=c(-7,7)),
+emmeans(m3, pairwise~Block|SP_z,
+        at=list(SP_z=c(-7,7)),
         adjust='Bonferroni')
-emmeans(m3, pairwise~Block, adjust='Bonferroni')
+emmeans(m3, pairwise~Block, 
+        adjust='Bonferroni')
 
 #Graphs
 
-visreg(m3, xvar = 'SP_z', by='Block',line=list(col='#2D718EFF'),
-       gg=T) + theme_bw()+ 
-  xlab("Soziale Stärke")+ ylab("IGT-Score")+
-  theme(axis.title.x = element_text(size=18))+
-  theme(axis.title.y = element_text(size=18))+
-  theme(axis.text.x = element_text(size = 15))+
-  theme(axis.text.y = element_text(size = 15))+
-  theme(strip.text = element_text(size = 12, face="bold")) 
+emmip(m3,Block ~ SP_z, at = list(SP_z = c(-7, 7)), 
+      CIs=T,engine ="ggplot") + theme_bw() + 
+      theme(axis.text.x = element_text(size = 13)) + 
+      theme(axis.title.x = element_text(size=15))+
+      theme(axis.title.y = element_text(size=15))+
+      theme(axis.text.y = element_text(size=13))+
+      scale_color_manual(values = viridis(3, option = 'D', end=.6, direction = -1),
+                         (name="Block"), labels=c("1", "2", "3"))+
+      theme(legend.text = element_text(size=10))+
+      theme(legend.title = element_text(size = 10, face = "bold" ))+
+      xlab("Soziale Stärke") + ylab("IGT-Score") + 
+      scale_x_discrete(labels=c("-7" = "-1SD", "7" = "+1SD"))
 
 #Residuals ok?
 
-resid(m3)
-car::qqPlot(resid(m3))
+sjPlot::plot_model(m3, "diag")
 
-#----------3) Payofff------------------
+#change order of levels 
+Data_reg$Block <- factor(Data_reg$Block, levels = c('2', '3', '1'))
+contrasts(Data_reg$Block) <- contr.sum(3); contrasts(Data_reg$Block)
+#refit model#
+
+#Get table
+
+sjPlot::tab_model(m3, show.aic = T, show.std = T, show.r2 = T, string.pred = 'Prädiktoren', 
+                  pred.labels = c("(Intercept)","Block 2",
+                                  "Block 3", "Glücklichkeit", "Leistung",
+                                  "soziale Stärke",
+                                  "Block 2*Glücklichkeit", "Block 3*Glücklichkeit",
+                                  "Block 2*Leistung", "Block 3*Leistung",
+                                  "Block 2*soziale Stärke", "Block 3*soziale Stärke"), 
+                  dv.labels='IGT-Score')
+
+#change order of levels back to normal
+Data_reg$Block <- factor(Data_reg$Block, levels = c('1', '2', '3'))  
+contrasts(Data_reg$Block) <- contr.sum(3); contrasts(Data_reg$Block)
+#refit model#
+
+#--------3) Payofff------------------
 
 #Correlation IGT-Score and Payoff
 
@@ -380,37 +504,67 @@ sd(Data_reg$BIS_z)
 
 #Post-hoc
 
-emmeans(m1, pairwise~Block|BIS_z,at=list(BIS_z=c(-12,12)),
+emmeans(m1, pairwise~Block|BIS_z,
+        at=list(BIS_z=c(-12,12)),
         adjust='Bonferroni')
-emmeans(m1, pairwise~Block|MAE_Score_z,at=list(MAE_Score_z=c(-13,13)),
+emmeans(m1, pairwise~Block|MAE_Score_z,
+        at=list(MAE_Score_z=c(-13,13)),
         adjust='Bonferroni')
-emmeans(m1, pairwise~Block, adjust='Bonferroni')
+emmeans(m1, pairwise~Block, 
+        adjust='Bonferroni')
 
 #Graphs
 
-visreg(m1, xvar = 'MAE_Score_z', by='Block',line=list(col='#20A386FF'),
-       gg=T) + theme_bw()+
-  xlab("Extraversion")+ ylab("Punktestand")+
-  theme(axis.title.x = element_text(size=18))+
-  theme(axis.title.y = element_text(size=18))+
-  theme(axis.text.x = element_text(size = 15))+
-  theme(axis.text.y = element_text(size = 15))+
-  theme(strip.text = element_text(size = 12, face="bold"))
+emmip(m1,Block ~ MAE_Score_z, at = list(MAE_Score_z = c(-13, 13)), 
+      CIs=T,engine ="ggplot") + theme_bw() + 
+      theme(axis.text.x = element_text(size = 13)) + 
+      theme(axis.title.x = element_text(size=15))+
+      theme(axis.title.y = element_text(size=15))+
+      theme(axis.text.y = element_text(size=13))+
+      scale_color_manual(values = viridis(3, option = 'D', end=.6, direction = -1),
+                         (name="Block"), labels=c("1", "2", "3"))+
+      theme(legend.text = element_text(size=10))+
+      theme(legend.title = element_text(size = 10, face = "bold" ))+
+      xlab("Extraversion") + ylab("Punktestand")  +
+      scale_x_discrete(labels=c("-13" = "-1SD", "13" = "+1SD"))
 
-visreg(m1, xvar = 'BIS_z', by='Block',line=list(col='#20A386FF'),
-       gg=T) + theme_bw()+ 
-  xlab("BIS")+ ylab("Punktestand")+
-  theme(axis.title.x = element_text(size=18))+
-  theme(axis.title.y = element_text(size=18))+
-  theme(axis.text.x = element_text(size = 15))+
-  theme(axis.text.y = element_text(size = 15))+
-  theme(strip.text = element_text(size = 12, face="bold"))
+emmip(m1,Block ~ BIS_z, at = list(BIS_z = c(-12, 12)), 
+      CIs=T,engine ="ggplot") + theme_bw() + 
+      theme(axis.text.x = element_text(size = 13)) + 
+      theme(axis.title.x = element_text(size=15))+
+      theme(axis.title.y = element_text(size=15))+
+      theme(axis.text.y = element_text(size=13))+
+      scale_color_manual(values = viridis(3, option = 'D', end=.6, direction = -1),
+                         (name="Block"), labels=c("1", "2", "3"))+
+      theme(legend.text = element_text(size=10))+
+      theme(legend.title = element_text(size = 10, face = "bold" ))+
+      xlab("BIS") + ylab("Punktestand") + 
+      scale_x_discrete(labels=c("-12" = "-1SD", "12" = "+1SD"))
 
 #Residuals ok?
 
-resid(m1)
-car::qqPlot(resid(m1))
+sjPlot::plot_model(m1, "diag")
 
+#change order of levels 
+Data_reg$Block <- factor(Data_reg$Block, levels = c('2', '3', '1'))
+contrasts(Data_reg$Block) <- contr.sum(3); contrasts(Data_reg$Block)
+#refit model#
+
+#Get table
+
+sjPlot::tab_model(m1, show.aic = T, show.std = T, show.r2 = T, string.pred = 'Prädiktoren', 
+                  pred.labels = c("(Intercept)","Block 2",
+                                  "Block 3", "BAS", "BIS", "FFFS", 
+                                  "Extraversion", "Block 2*BAS", "Block 3*BAS", 
+                                  "Block 2*BIS", "Block 3*BIS", 
+                                  "Block 2*FFFS", "Block 3*FFFS", 
+                                  "Block 2*Extraversion", "Block 3*Extraversion"), 
+                  dv.labels='Punktestand')
+
+#change order of levels back to normal
+Data_reg$Block <- factor(Data_reg$Block, levels = c('1', '2', '3'))  
+contrasts(Data_reg$Block) <- contr.sum(3); contrasts(Data_reg$Block)
+#refit model#
 
 #----Model with random intercept, by Block, Rew_Int, Rew_Reac, Goal_Drive, Impulsiv (BAS-Subscales)
 
@@ -421,13 +575,21 @@ m2<-lmer(Payoff~Block*BAS_Rew_Int_z+
 anova(m2)
 summary(m2)
 
+#model without interaction
+m2_1<-lmer(Payoff~Block+BAS_Rew_Int_z+ 
+           Block+BAS_Rew_Reac_z+ 
+           Block+BAS_Goal_Drive_z+
+           Block+BAS_Impulsiv_z+ (1|VP), data=Data_reg, REML=F)
+anova(m2_1)
+
 #Post-hoc
 
-emmeans(m2, pairwise~Block, adjust='Bonferroni')
-emtrends(m2, var='BAS_Goal_Drive_z', ~1, 
+emmeans(m2_1, pairwise~Block, 
+        adjust='Bonferroni')
+emtrends(m2_1, var='BAS_Goal_Drive_z', ~1, 
          at=list(BAS_Rew_Int_z=0, BAS_Rew_Reac_z=0, BAS_Impulsiv_z=0), 
          adjust='Bonferroni')
-emtrends(m2, var='BAS_Rew_Reac_z', ~1, 
+emtrends(m2_1, var='BAS_Rew_Reac_z', ~1, 
          at=list(BAS_Goal_Drive_z=0, BAS_Rew_Int_z=0, BAS_Impulsiv_z=0), 
          adjust='Bonferroni')
 
@@ -435,22 +597,46 @@ emtrends(m2, var='BAS_Rew_Reac_z', ~1,
 
 visreg(m2, xvar='BAS_Goal_Drive_z', line=list(col='#20A386FF'),
        xlab=("Zielgerichtete Beharrlichkeit"), ylab=("Punktestand"), gg=T)+ theme_bw()+
-  theme(axis.title.x = element_text(size=18))+
-  theme(axis.title.y = element_text(size=18))+
-  theme(axis.text.x = element_text(size = 15))+
-  theme(axis.text.y = element_text(size = 15))
+      theme(axis.title.x = element_text(size=18))+
+      theme(axis.title.y = element_text(size=18))+
+      theme(axis.text.x = element_text(size = 15))+
+      theme(axis.text.y = element_text(size = 15))
 
 visreg(m2, xvar='BAS_Rew_Reac_z', line=list(col='#20A386FF'),
        xlab=("Reaktivität auf Belohnung"), ylab=("Punktestand"), gg=T)+ theme_bw()+
-  theme(axis.title.x = element_text(size=18))+
-  theme(axis.title.y = element_text(size=18))+
-  theme(axis.text.x = element_text(size = 15))+
-  theme(axis.text.y = element_text(size = 15))
+      theme(axis.title.x = element_text(size=18))+
+      theme(axis.title.y = element_text(size=18))+
+      theme(axis.text.x = element_text(size = 15))+
+      theme(axis.text.y = element_text(size = 15))
 
 #Residuals ok?
 
-resid(m2)
-car::qqPlot(resid(m2))
+sjPlot::plot_model(m2, "diag")
+
+#change order of levels 
+Data_reg$Block <- factor(Data_reg$Block, levels = c('2', '3', '1'))
+contrasts(Data_reg$Block) <- contr.sum(3); contrasts(Data_reg$Block)
+#refit model#
+
+#Get table
+
+sjPlot::tab_model(m2,m2_1, show.aic = T, show.std = T, show.r2 = T, string.pred = 'Prädiktoren', 
+                  pred.labels = c("(Intercept)","Block 2",
+                                  "Block 3", "Interesse a. Belohnung", 
+                                  "Reaktivität a. Belohnung",
+                                  "z. Beharrlichkeit","Impulsivität",
+                                  "Block 2*Interesse a. Belohnung", 
+                                  "Block 3*Interesse a. Belohnung",
+                                  "Block 2*Reaktivität a. Belohnung", 
+                                  "Block 3*Reaktivität a. Belohnung",
+                                  "Block 2*z. Beharrlichkeit", "Block 3*z. Beharrlichkeit", 
+                                  "Block 2*Impulsivität", "Block 3*Impulsivität"), 
+                  dv.labels='Punktestand')
+
+#change order of levels back to normal
+Data_reg$Block <- factor(Data_reg$Block, levels = c('1', '2', '3'))  
+contrasts(Data_reg$Block) <- contr.sum(3); contrasts(Data_reg$Block)
+#refit model#
 
 
 #----Model with random intercept, by Block, PE, AC, SP (MAE-Subscales)
@@ -465,27 +651,54 @@ sd(Data_reg$SP_z)
 
 #Post-hoc
 
-emmeans(m3, pairwise~Block|SP_z, at=list(Sp_z=c(-7, 7)),
+emmeans(m3, pairwise~Block|SP_z, 
+        at=list(SP_z=c(-7, 7)),
         adjust='Bonferroni')
-emmeans(m3, pairwise~Block, adjust='Bonferroni')
+emmeans(m3, pairwise~Block, 
+        adjust='Bonferroni')
 
 #Graphs
 
-visreg(m3, xvar = 'SP_z', by='Block',line=list(col='#20A386FF'),
-       gg=T) + theme_bw()+ 
-  xlab("Soziale Stärke")+ ylab("Punktestand")+
-  theme(axis.title.x = element_text(size=18))+
-  theme(axis.title.y = element_text(size=18))+
-  theme(axis.text.x = element_text(size = 15))+
-  theme(axis.text.y = element_text(size = 15))+
-  theme(strip.text = element_text(size = 12, face="bold")) 
+emmip(m3,Block ~ SP_z, at = list(SP_z = c(-7, 7)), 
+      CIs=T,engine ="ggplot") + theme_bw() + 
+      theme(axis.text.x = element_text(size = 13)) + 
+      theme(axis.title.x = element_text(size=15))+
+      theme(axis.title.y = element_text(size=15))+
+      theme(axis.text.y = element_text(size=13))+
+      scale_color_manual(values = viridis(3, option = 'D', end=.6, direction = -1),
+                         (name="Block"), labels=c("1", "2", "3"))+
+      theme(legend.text = element_text(size=10))+
+      theme(legend.title = element_text(size = 10, face = "bold" ))+
+      xlab("Soziale Stärke") + ylab("Punktestand") +
+      scale_x_discrete(labels=c("-7" = "-1SD", "7" = "+1SD"))
 
 #Residuals ok?
 
-resid(m3)
-car::qqPlot(resid(m3))
+sjPlot::plot_model(m3, "diag")
 
-#----------4) RT_log-----------------
+#change order of levels 
+Data_reg$Block <- factor(Data_reg$Block, levels = c('2', '3', '1'))
+contrasts(Data_reg$Block) <- contr.sum(3); contrasts(Data_reg$Block)
+#refit model#
+
+#Get table
+
+sjPlot::tab_model(m3, show.aic = T, show.std = T, show.r2 = T, string.pred = 'Prädiktoren', 
+                  pred.labels = c("(Intercept)","Block 2",
+                                  "Block 3", "Glücklichkeit", "Leistung",
+                                  "soziale Stärke",
+                                  "Block 2*Glücklichkeit", "Block 3*Glücklichkeit",
+                                  "Block 2*Leistung", "Block 3*Leistung",
+                                  "Block 2*soziale Stärke", "Block 3*soziale Stärke"), 
+                  dv.labels='Punktestand')
+
+#change order of levels back to normal
+Data_reg$Block <- factor(Data_reg$Block, levels = c('1', '2', '3'))  
+contrasts(Data_reg$Block) <- contr.sum(3); contrasts(Data_reg$Block)
+#refit model#
+
+
+#--------4) RT_log-----------------
 
 #----Model with random intercept, by Block, BAS, BIS, FFFS, MAE
 
@@ -497,45 +710,80 @@ m1<-lmer(RT_log ~
 anova(m1)
 summary(m1)
 
+#Model without interaction
+m1_1<-lmer(RT_log ~ 
+           Block+BAS_Score_z +
+           Block+BIS_z + 
+           Block+FFFS_z +
+           Block+MAE_Score_z + (1|VP), data=Data_reg, REML = F)
+anova(m1_1)
+
+#Model with inverse RT
+m0<-lmer(-1000/RT_mean ~ 
+           Block*BAS_Score_z +
+           Block*BIS_z + 
+           Block*FFFS_z +
+           Block*MAE_Score_z + (1|VP), data=Data_reg, REML = F)
+anova(m0)
+sjPlot::plot_model(m0, "diag")
+
 #Post-hoc
 
-emmeans(m1, pairwise~Block, adjust='Bonferroni')
-emtrends(m1, var='BAS_Score_z', ~1, 
+emmeans(m1_1, pairwise~Block, 
+        adjust='Bonferroni')
+emtrends(m1_1, var='BAS_Score_z', ~1, 
          at=list(BIS_z=0, FFFS_z=0, MAE_Score_z=0), 
          adjust='Bonferroni')
-emtrends(m1, var='FFFS_z', ~1, 
+emtrends(m1_1, var='FFFS_z', ~1, 
          at=list(BAS_Score_z=0, BIS_z=0, MAE_Score_z=0), 
          adjust='Bonferroni')
 
 #Graphs
 
-visreg(m1, xvar='Block', line=list(col='#481568FF'),
-       xlab=("Block"), ylab=("Reaktionszeit"), gg=T)+ theme_bw()+
-  theme(axis.title.x = element_text(size=18))+
-  theme(axis.title.y = element_text(size=18))+
-  theme(axis.text.x = element_text(size = 15))+
-  theme(axis.text.y = element_text(size = 15))+
-  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
-
 visreg(m1, xvar='BAS_Score_z', line=list(col='#481568FF'),
        xlab=("BAS"), ylab=("Reaktionszeit"), gg=T)+ theme_bw()+
-  theme(axis.title.x = element_text(size=18))+
-  theme(axis.title.y = element_text(size=18))+
-  theme(axis.text.x = element_text(size = 15))+
-  theme(axis.text.y = element_text(size = 15))
+      theme(axis.title.x = element_text(size=18))+
+      theme(axis.title.y = element_text(size=18))+
+      theme(axis.text.x = element_text(size = 15))+
+      theme(axis.text.y = element_text(size = 15))
 
 visreg(m1, xvar='FFFS_z', line=list(col='#481568FF'),
        xlab=("FFFS"), ylab=("Reaktionszeit"), gg=T)+ theme_bw()+
-  theme(axis.title.x = element_text(size=18))+
-  theme(axis.title.y = element_text(size=18))+
-  theme(axis.text.x = element_text(size = 15))+
-  theme(axis.text.y = element_text(size = 15))
+      theme(axis.title.x = element_text(size=18))+
+      theme(axis.title.y = element_text(size=18))+
+      theme(axis.text.x = element_text(size = 15))+
+      theme(axis.text.y = element_text(size = 15))
 
 #Residuals ok?
 
-resid(m1)
-car::qqPlot(resid(m1))
+sjPlot::plot_model(m1, "diag")
 
+#change order of levels 
+Data_reg$Block <- factor(Data_reg$Block, levels = c('2', '3', '1'))
+contrasts(Data_reg$Block) <- contr.sum(3); contrasts(Data_reg$Block)
+#refit model#
+
+#Get table
+
+sjPlot::tab_model(m1_1, show.aic = T, show.std = T, show.r2 = T, string.pred = 'Prädiktoren', 
+                  pred.labels = c("(Intercept)","Block 2",
+                                  "Block 3", "BAS", "BIS", "FFFS", 
+                                  "Extraversion"), 
+                  dv.labels='Reaktionszeit')
+
+sjPlot::tab_model(m1,m0, show.aic = T, show.std = T, show.r2 = T, string.pred = 'Prädiktoren', 
+                  pred.labels = c("(Intercept)","Block 2",
+                                  "Block 3", "BAS", "BIS", "FFFS", 
+                                  "Extraversion", "Block 2*BAS", "Block 3*BAS", 
+                                  "Block 2*BIS", "Block 3*BIS", 
+                                  "Block 2*FFFS", "Block 3*FFFS", 
+                                  "Block 2*Extraversion", "Block 3*Extraversion"), 
+                  dv.labels='Reaktionszeit')
+
+#change order of levels back to normal
+Data_reg$Block <- factor(Data_reg$Block, levels = c('1', '2', '3'))  
+contrasts(Data_reg$Block) <- contr.sum(3); contrasts(Data_reg$Block)
+#refit model#
 
 #----Model with random intercept, by Block, Rew_Int, Rew_Reac, Goal_Drive, Impulsiv (BAS-Subscales)
 
@@ -547,29 +795,68 @@ m2<-lmer(RT_log ~
 anova(m2)
 summary(m2)
 
+#Model with inverse RT
+m02<-lmer(-1000/RT_mean ~ 
+            Block*BAS_Rew_Int_z + 
+            Block*BAS_Rew_Reac_z + 
+            Block*BAS_Goal_Drive_z + 
+            Block*BAS_Impulsiv_z + (1|VP), data=Data_reg, REML = F)
+anova(m02)
+sjPlot::plot_model(m02, "diag")
+
 sd(Data_reg$BAS_Rew_Int_z)
 
 #Post-hoc
 
-emmeans(m2, pairwise~Block|BAS_Rew_Int_z, at=list(BAS_Rew_Int_z=c(-3,3)),
+emmeans(m2, pairwise~Block|BAS_Rew_Int_z, 
+        at=list(BAS_Rew_Int_z=c(-3,3)),
         adjust='Bonferroni')
-emmeans(m2, pairwise~Block, adjust='Bonferroni')
+emmeans(m2, pairwise~Block, 
+        adjust='Bonferroni')
 
 #Graphs
 
-visreg(m2, xvar = 'BAS_Rew_Int_z', by='Block',line=list(col='#481568FF'),
-       gg=T) + theme_bw()+ 
-  xlab("Interesse an Belohnung")+ ylab("Reaktionszeit")+
-  theme(axis.title.x = element_text(size=18))+
-  theme(axis.title.y = element_text(size=18))+
-  theme(axis.text.x = element_text(size = 15))+
-  theme(axis.text.y = element_text(size = 15))+
-  theme(strip.text = element_text(size = 12, face="bold"))
+emmip(m2,Block ~ BAS_Rew_Int_z, at = list(BAS_Rew_Int_z = c(-3, 3)), 
+      CIs=T,engine ="ggplot") + theme_bw() + 
+      theme(axis.text.x = element_text(size = 13)) + 
+      theme(axis.title.x = element_text(size=15))+
+      theme(axis.title.y = element_text(size=15))+
+      theme(axis.text.y = element_text(size=13))+
+      scale_color_manual(values = viridis(3, option = 'D', end=.6, direction = -1),
+                         (name="Block"), labels=c("1", "2", "3"))+
+      theme(legend.text = element_text(size=10))+
+      theme(legend.title = element_text(size = 10, face = "bold" ))+
+      xlab("Interesse an Belohnung") + ylab("RT") +
+      scale_x_discrete(labels=c("-3" = "-1SD", "3" = "+1SD"))
 
 #Residuals ok?
 
-resid(m2)
-car::qqPlot(resid(m2))
+sjPlot::plot_model(m2, "diag")
+
+#change order of levels 
+Data_reg$Block <- factor(Data_reg$Block, levels = c('2', '3', '1'))
+contrasts(Data_reg$Block) <- contr.sum(3); contrasts(Data_reg$Block)
+#refit model#
+
+#Get table
+
+sjPlot::tab_model(m2,m02, show.aic = T, show.std = T, show.r2 = T, string.pred = 'Prädiktoren', 
+                  pred.labels = c("(Intercept)","Block 2",
+                                  "Block 3", "Interesse a. Belohnung", 
+                                  "Reaktivität a. Belohnung",
+                                  "z. Beharrlichkeit","Impulsivität",
+                                  "Block 2*Interesse a. Belohnung", 
+                                  "Block 3*Interesse a. Belohnung",
+                                  "Block 2*Reaktivität a. Belohnung", 
+                                  "Block 3*Reaktivität a. Belohnung",
+                                  "Block 2*z. Beharrlichkeit", "Block 3*z. Beharrlichkeit", 
+                                  "Block 2*Impulsivität", "Block 3*Impulsivität"), 
+                  dv.labels='Reaktionszeit')
+
+#change order of levels back to normal
+Data_reg$Block <- factor(Data_reg$Block, levels = c('1', '2', '3'))  
+contrasts(Data_reg$Block) <- contr.sum(3); contrasts(Data_reg$Block)
+#refit model#
 
 
 #----Model with random intercept, by Block, PE, AC, SP (MAE-Subscales)
@@ -581,29 +868,58 @@ m3<-lmer(RT_log ~
 anova(m3)
 summary(m3)
 
+#Model without interaction
+m3_1<-lmer(RT_log ~ 
+           Block+PE_z +
+           Block+AC_z +
+           Block+SP_z + (1|VP), data=Data_reg, REML = F)
+anova(m3_1)
+
+#Model with inverse RT
+m03<-lmer(-1000/RT_mean ~ 
+            Block+PE_z +
+            Block+AC_z +
+            Block+SP_z + (1|VP), data=Data_reg, REML = F)
+anova(m03)
+sjPlot::plot_model(m03, "diag")
+
 #Post-hoc
 
-emmeans(m3, pairwise~Block, adjust='Bonferroni')
+emmeans(m3_1, pairwise~Block, 
+        adjust='Bonferroni')
 
 #Residuals ok?
 
-resid(m3)
-car::qqPlot(resid(m3))
+sjPlot::plot_model(m3, "diag")
 
-#----Model with random intercept, by Block only
+#change order of levels 
+Data_reg$Block <- factor(Data_reg$Block, levels = c('2', '3', '1'))
+contrasts(Data_reg$Block) <- contr.sum(3); contrasts(Data_reg$Block)
+#refit model#
 
-m4<-lmer(RT_log~Block + (1|VP), data = Data_reg, REML = F)
-anova(m4)
-summary(m4)
+#Get table
 
-#Post-hoc
+sjPlot::tab_model(m3, m3_1, show.aic = T, show.std = T, show.r2 = T, 
+                  string.pred = 'Prädiktoren', 
+                  pred.labels = c("(Intercept)","Block 2",
+                                  "Block 3", "Glücklichkeit", "Leistung",
+                                  "soziale Stärke",
+                                  "Block 2*Glücklichkeit", "Block 3*Glücklichkeit",
+                                  "Block 2*Leistung", "Block 3*Leistung",
+                                  "Block 2*soziale Stärke", "Block 3*soziale Stärke"), 
+                  dv.labels='Reaktionszeit')
 
-emmeans(m4, pairwise ~ Block, adjust='Bonferroni')
+sjPlot::tab_model(m3_1, m03, show.aic = T, show.std = T, show.r2 = T, 
+                  string.pred = 'Prädiktoren', 
+                  pred.labels = c("(Intercept)","Block 2",
+                                  "Block 3", "Glücklichkeit", "Leistung",
+                                  "soziale Stärke"), 
+                  dv.labels='Reaktionszeit')
 
-# Residuals ok?
-
-resid(m4)
-car::qqPlot(resid(m4))
+#change order of levels back to normal
+Data_reg$Block <- factor(Data_reg$Block, levels = c('1', '2', '3'))  
+contrasts(Data_reg$Block) <- contr.sum(3); contrasts(Data_reg$Block)
+#refit model#
 
 
 #----RT after losses
@@ -612,18 +928,59 @@ car::qqPlot(resid(m4))
 
 m1<-lmer(RT_log ~  Cond * Card + Card * Block + Cond * Block+ 
            (1|VP), data = Data_loss_win, REML=F)
-summary(m1)
+summary(m1_1)
 anova(m1)
+
+#Model without intercations
+m1_1<-lmer(RT_log ~  Cond+ Card+ Block+ 
+           (1|VP), data = Data_loss_win, REML=F)
+AIC(m1, m1_1)
+anova(m1_1)
 
 #Post-hoc
 
-emmeans(m1, pairwise ~ Block | Cond, adjust='Bonferroni')
-emmeans(m1, pairwise ~ Cond | Block, adjust='Bonferroni')
+emmeans(m1, pairwise ~ Cond | Block, 
+        adjust='Bonferroni')
+emmeans(m1, pairwise ~ Block | Cond, 
+        adjust='Bonferroni')
+emmeans(m1_1, pairwise ~ Cond, 
+        adjust='Bonferroni')
 
 #Residuals ok?
 
-resid(m1)
-car::qqPlot(resid(m1))
+sjPlot::plot_model(m1, "diag")
+
+#change order of levels 
+Data_loss_win$Block <- factor(Data_loss_win$Block, levels = c('2', '3', '1'))
+contrasts(Data_loss_win$Block) <- contr.sum(3); contrasts(Data_loss_win$Block)
+#refit model#
+
+#Get table
+
+sjPlot::tab_model(m1,m1_1, show.aic = T, show.std = T, show.r2 = T, 
+                  string.pred = 'Prädiktoren', 
+                  pred.labels = c("(Intercept)","nach Gewinn",
+                                  "Karte B", "Karte C", "Karte D",
+                                  "Block 2", "Block 3",
+                                  "nach Gewinn*Karte B", "nach Gewinn*Karte C", 
+                                  "nach Gewinn*Karte D", "Karte B*Block 2", 
+                                  "Karte C*Block 3","Karte D*Block 2", 
+                                  "Karte B*Block 3", "Karte C*Block 3",
+                                  "Karte D*Block 3","nach Gewinn*Block 2", 
+                                  "nach Gewinn*Block 2"), 
+                  dv.labels='Reaktionszeit')
+
+sjPlot::tab_model(m1_1, show.aic = T, show.std = T, show.r2 = T, string.pred = 'Prädiktoren', 
+                  pred.labels = c("(Intercept)","nach Gewinn",
+                                  "Karte B", "Karte C", "Karte D",
+                                  "Block 2", "Block 3"), 
+                  dv.labels='Reaktionszeit')
+
+#change order of levels back to normal
+Data_loss_win$Block <- factor(Data_loss_win$Block, levels = c('1', '2', '3'))
+contrasts(Data_loss_win$Block) <- contr.sum(3); contrasts(Data_loss_win$Block)
+#refit model#
+
 
 #Graphs
 
@@ -639,7 +996,7 @@ emmip(m1, Cond ~ Block, CIs=T,engine ="ggplot") + theme_bw() +
   xlab("Block") +
   ylab("Reaktionszeit") 
 
-emmip(m1, Cond~Block|Card, CIs=T)+ theme_bw()+
+emmip(m1_1, Cond ~ Block, CIs=T,engine ="ggplot") + theme_bw() + 
   theme(axis.text.x = element_text(size = 13)) + 
   theme(axis.title.x = element_text(size=15))+
   theme(axis.title.y = element_text(size=15))+
@@ -648,19 +1005,10 @@ emmip(m1, Cond~Block|Card, CIs=T)+ theme_bw()+
                      (name="Bedingung"), labels=c("nach Verlust", "nach Gewinn"))+
   theme(legend.text = element_text(size=10))+
   theme(legend.title = element_text(size = 10, face = "bold" ))+
-  theme(strip.text = element_text(size = 10, face = "bold"))
-xlab("Block") +
+  xlab("Block") +
   ylab("Reaktionszeit")
 
-
-emmip(m1, Cond~Card|Block, CIs=T)+ theme_bw()
-emmip(m1, Card~Cond|Block, CIs=T)+ theme_bw()
-emmip(m1, Block~Cond|Card, CIs=T)+ theme_bw()
-emmip(m1, Card~Block|Cond, CIs=T)+ theme_bw()
-emmip(m1, Block~Card|Cond, CIs=T)+ theme_bw()
-
-
-#----------5) Tables (for basic layout, needs to be filled in by hand)--------------
+#--------5) Tables (for basic layout, needs to be filled in by hand)--------------
 
 apa.reg.table(m1_1, filename = "D:\\Users\\Linda Tempel\\Documents\\Psychologie\\Bachelorarbeit\\Daten\\Table11.doc", table.number = 1)
 

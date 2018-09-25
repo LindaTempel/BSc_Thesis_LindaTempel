@@ -124,7 +124,7 @@ psych::alpha(dplyr::select(RST, RS01_12, RS01_15, RS01_17,
 
 # BAS Reward Reactivity
 psych::alpha(dplyr::select(RST, RS01_03, RS01_04, RS01_09, RS01_19, 
-                           RS01_30, RS01_32, RS01_32, RS01_38, 
+                           RS01_30, RS01_31, RS01_32, RS01_38, 
                            RS01_45, RS01_47), 
              check.keys = TRUE)
 
@@ -142,7 +142,7 @@ psych::alpha(dplyr::select(RST, RS01_29, RS01_35, RS01_36, RS01_48,
 psych::alpha(dplyr::select(RST, RS01_12, RS01_15, RS01_17, 
                            RS01_18, RS01_33, RS01_40, RS01_44,
                            RS01_03, RS01_04, RS01_09, RS01_19, 
-                           RS01_30, RS01_32, RS01_32, RS01_38, 
+                           RS01_30, RS01_31, RS01_32, RS01_38, 
                            RS01_45, RS01_47,
                            RS01_05, RS01_13, RS01_25, RS01_39, 
                            RS01_54, RS01_71, RS01_84,
@@ -159,7 +159,7 @@ RST <- dplyr::mutate(RST,
                               RS01_37 + RS01_41 + RS01_42 + RS01_55 + RS01_56 + RS01_62 + RS01_65 + RS01_66 +
                               RS01_74 + RS01_75 + RS01_76 +  RS01_79 + RS01_80 + RS01_82 + RS01_83),
                      BAS_Rew_Int = (RS01_12 + RS01_15 + RS01_17 + RS01_18 + RS01_33 + RS01_40 + RS01_44),
-                     BAS_Rew_Reac = (RS01_03 + RS01_04 + RS01_09 + RS01_19 + RS01_30 + RS01_32 + RS01_32 + RS01_38 + RS01_45 + RS01_47),
+                     BAS_Rew_Reac = (RS01_03 + RS01_04 + RS01_09 + RS01_19 + RS01_30 + RS01_31 + RS01_32 + RS01_38 + RS01_45 + RS01_47),
                      BAS_Goal_Drive = (RS01_05 + RS01_13 + RS01_25 + RS01_39 + RS01_54 + RS01_71 + RS01_84),
                      BAS_Impulsiv = (RS01_29 +  RS01_35 + RS01_36 + RS01_48 + RS01_53 + RS01_57 + RS01_68 + RS01_70))
 
